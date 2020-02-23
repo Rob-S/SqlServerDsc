@@ -1403,6 +1403,11 @@ No description.
   is 'WindowsUser' or 'WindowsGroup' then provide the name in the format DOMAIN\name.
   Default is WindowsUser. Unsupported login types are Certificate, AsymmetricKey,
   ExternalUser, and ExternalGroup. {SqlLogin | WindowsUser | WindowsGroup }
+* **`[String]` Sid** _(Write)_: The Sid of the user.  If not defined, Sql Server will 
+  allocate a random Sid.  Useful in Always On scenarios where Logins on all servers
+  in the cluster must have the same Sid.  Specify in T-SQL format, e.g.
+  0xbfd4fcb0778e4b4c8b7390fc1a587ca9.  Can be generatd in Powershell with:
+  `"0x$((New-Guid).ToString("N"))"`
 * **`[Boolean]` LoginMustChangePassword** _(Write)_: Specifies if the login is required
   to have its password change on the next login. Only applies to SQL Logins.
   Default is $true.

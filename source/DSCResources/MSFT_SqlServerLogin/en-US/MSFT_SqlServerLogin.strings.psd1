@@ -32,4 +32,8 @@ ConvertFrom-StringData @'
     DropLoginFailed = Removal of the login '{0}' failed.
     SetPasswordValidationFailed = Setting the password failed for the login '{0}' because of password validation error.
     SetPasswordFailed = Setting the password failed for the login '{0}'.
+    IncorrectSidFormat = Sid '{0}' is not a valid format for SqlLogin.  Please use a hex string with leading '0x', as per the response from the T-SQL SUSER_SID function.
+    ExpectedSidToMatch = Configured Sid '{0}' doesn't match existing login sid '{1}'.
+    UnableToChangeSid = Unable to change Sid to '{0}' from '{1}'.  Please remove and recreate the login to create it with a specific Sid.
+    SidOnlyValidWithSqlLogin = Sid can only be specified with a SqlLogin type.
 '@
