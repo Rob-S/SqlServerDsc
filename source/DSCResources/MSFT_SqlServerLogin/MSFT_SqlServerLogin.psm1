@@ -57,7 +57,7 @@ function Get-TargetResource
         }
     }
 
-    Write-Verbose -Message (
+    Write-Host -Message (
         $script:localizedData.LoginCurrentState -f $Name, $ensure, $ServerName, $InstanceName
     )
 
@@ -72,6 +72,7 @@ function Get-TargetResource
 
     if ($login.LoginType -eq 'SqlLogin')
     {
+        $returnValue.Add('Sid', (ConvertSidTo-String $login.Sid))
         $returnValue.Add('LoginMustChangePassword', $login.MustChangePassword)
         $returnValue.Add('LoginPasswordExpirationEnabled', $login.PasswordExpirationEnabled)
         $returnValue.Add('LoginPasswordPolicyEnforced', $login.PasswordPolicyEnforced)
@@ -101,6 +102,9 @@ function Get-TargetResource
 
     .PARAMETER LoginCredential
     The credential containing the password for a SQL Login. Only applies if the login type is SqlLogin.
+
+    .PARAMETER Sid
+    The Sid to create the login with in hex format, e.g. "0x43FA0951BF257D4EA24956B4D89A6930" as returned by select SUSER_SID('test'). Only applies if the login type is SqlLogin.
 
     .PARAMETER LoginMustChangePassword
     Specifies if the login is required to have its password change on the next login. Only applies to SQL Logins. Default is $true.
@@ -154,6 +158,10 @@ function Set-TargetResource
         $LoginCredential,
 
         [Parameter()]
+        [System.String]
+        $Sid,
+
+        [Parameter()]
         [System.Boolean]
         $LoginMustChangePassword = $true,
 
@@ -176,12 +184,26 @@ function Set-TargetResource
     {
         'Present'
         {
+
+            if ((-not [string]::IsNullOrEmpty($Sid)) -and ($LoginType -ne 'SqlLogin'))
+            {
+                $errorMessage = $script:localizedData.SidOnlyValidWithSqlLogin
+                New-InvalidOperationException -Message $errorMessage
+            }
+
             if ( $serverObject.Logins[$Name] )
             {
                 $login = $serverObject.Logins[$Name]
 
                 if ( $login.LoginType -eq 'SqlLogin' )
                 {
+
+                    if ((ConvertSidTo-String $login.Sid) -ne $Sid)
+                    {
+                        $errorMessage = $script:localizedData.UnableToChangeSid -f $Sid, $login.Sid
+                        New-InvalidOperationException -Message $errorMessage
+                    }
+
                     if ( $login.PasswordExpirationEnabled -ne $LoginPasswordExpirationEnabled )
                     {
                         Write-Verbose -Message (
@@ -266,6 +288,13 @@ function Set-TargetResource
                             New-InvalidOperationException -Message $errorMessage
                         }
 
+                        if ($Sid -ne $null) {
+
+                            $SidBytes = ConvertSidTo-Bytes $Sid
+
+                            $login.Sid = $SidBytes
+                        }
+
                         $login.PasswordPolicyEnforced = $LoginPasswordPolicyEnforced
                         $login.PasswordExpirationEnabled = $LoginPasswordExpirationEnabled
                         if ( $LoginMustChangePassword )
@@ -334,6 +363,9 @@ function Set-TargetResource
     .PARAMETER LoginCredential
     The credential containing the password for a SQL Login. Only applies if the login type is SqlLogin.
 
+    .PARAMETER Sid
+    The Sid to create the login with in hex format, e.g. "0x43FA0951BF257D4EA24956B4D89A6930" as returned by select SUSER_SID('test'). Only applies if the login type is SqlLogin.
+
     .PARAMETER LoginMustChangePassword
     Specifies if the login is required to have its password change on the next login. Only applies to SQL Logins. Default is $true.
 
@@ -384,6 +416,10 @@ function Test-TargetResource
         [Parameter()]
         [System.Management.Automation.PSCredential]
         $LoginCredential,
+
+        [Parameter()]
+        [System.String]
+        $Sid,
 
         [Parameter()]
         [System.Boolean]
@@ -457,6 +493,14 @@ function Test-TargetResource
 
         if ( $LoginType -eq 'SqlLogin' )
         {
+            if ( $Sid -ne $null -and $Sid -ne $loginInfo.Sid)
+            {
+                Write-Host -Message (
+                        $script:localizedData.ExpectedSidToMatch -f $Sid, $loginInfo.Sid
+                    )
+                $testPassed = $false
+            }
+
             if ( $LoginPasswordExpirationEnabled -ne $loginInfo.LoginPasswordExpirationEnabled )
             {
                 if ($LoginPasswordExpirationEnabled)
@@ -783,6 +827,55 @@ function Set-SQLServerLoginPassword
     {
         $ErrorActionPreference = $originalErrorActionPreference
     }
+}
+
+<#
+    .SYNOPSIS
+    Converts a Sid in Hex String format (e.g. "0xF899F3553DC7DE45960EA46444243042") to a byte array
+
+    .PARAMETER Sid
+    The Hex String to convert
+#>
+function ConvertSidTo-Bytes
+{
+    param
+    (
+        [Parameter(Mandatory = $true)]
+        [System.String]
+        $Sid
+    )
+
+    if (-not $Sid.Startswith("0x"))
+    {
+        $errorMessage = $script.localizedData.IncorrectSidFormat -f $Sid
+        New-InvalidOperationException -Message $errorMessage
+    }
+    $SidHex = $Sid.substring(2)
+    $SidBytes = [byte[]]::new($SidHex.Length / 2)
+
+    For($i=0; $i -lt $SidHex.Length; $i+=2){
+        $SidBytes[$i/2] = [convert]::ToByte($SidHex.Substring($i, 2), 16)
+    }
+    return $SidBytes
+}
+
+<#
+    .SYNOPSIS
+    Converts a Sid in byte array format to Hex string
+
+    .PARAMETER Sid
+    The Hex String to convert
+#>
+function ConvertSidTo-String
+{
+    param
+    (
+        [Parameter(Mandatory = $true)]
+        [byte[]]
+        $Sid
+    )
+
+    return "0x$(($Sid|ForEach-Object ToString X2) -join '')"
 }
 
 Export-ModuleMember -Function *-TargetResource

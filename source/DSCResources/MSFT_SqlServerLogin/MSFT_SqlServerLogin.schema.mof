@@ -9,6 +9,7 @@ class MSFT_SqlServerLogin : OMI_BaseResource
     [Key, Description("The hostname of the SQL Server to be configured.")] String ServerName;
     [Key, Description("Name of the SQL instance to be configured.")] String InstanceName;
     [Write, EmbeddedInstance("MSFT_Credential"), Description("If LoginType is 'SqlLogin' then a PSCredential is needed for the password to the login.")] String LoginCredential;
+    [Write, Description("The Sid of the login.")] String Sid;
     [Write, Description("Specifies if the login is required to have its password change on the next login. Only applies to SQL Logins. Default is $true.")] Boolean LoginMustChangePassword;
     [Write, Description("Specifies if the login password is required to expire in accordance to the operating system security policy. Only applies to SQL Logins. Default is $true.")] Boolean LoginPasswordExpirationEnabled;
     [Write, Description("Specifies if the login password is required to conform to the password policy specified in the system security policy. Only applies to SQL Logins. Default is $true.")] Boolean LoginPasswordPolicyEnforced;
