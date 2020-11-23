@@ -1,26 +1,35 @@
-$script:resourceModulePath = Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent
-$script:modulesFolderPath = Join-Path -Path $script:resourceModulePath -ChildPath 'Modules'
+<#
+    DEPRECATION NOTICE:
 
-$script:resourceHelperModulePath = Join-Path -Path $script:modulesFolderPath -ChildPath 'SqlServerDsc.Common'
-Import-Module -Name (Join-Path -Path $script:resourceHelperModulePath -ChildPath 'SqlServerDsc.Common.psm1')
+    THIS RESOURCE IS DEPRECATED!
 
-$script:localizedData = Get-LocalizedData -ResourceName 'MSFT_SqlDatabaseRecoveryModel'
+    Changes to this resource will no longer be merged. Instead please use the
+    resource SqlDatabase.
+#>
+
+$script:sqlServerDscHelperModulePath = Join-Path -Path $PSScriptRoot -ChildPath '..\..\Modules\SqlServerDsc.Common'
+$script:resourceHelperModulePath = Join-Path -Path $PSScriptRoot -ChildPath '..\..\Modules\DscResource.Common'
+
+Import-Module -Name $script:sqlServerDscHelperModulePath
+Import-Module -Name $script:resourceHelperModulePath
+
+$script:localizedData = Get-LocalizedData -DefaultUICulture 'en-US'
 
 <#
     .SYNOPSIS
-    This function gets all Key properties defined in the resource schema file
+    This function gets all Key properties defined in the resource schema file.
 
     .PARAMETER Name
-    This is the SQL database
+    This is the SQL database.
 
     .PARAMETER RecoveryModel
-    This is the RecoveryModel of the SQL database
+    This is the RecoveryModel of the SQL database.
 
     .PARAMETER ServerName
-    This is a the SQL Server for the database
+    This is a the SQL Server for the database. Default value is $env:COMPUTERNAME.
 
     .PARAMETER InstanceName
-    This is a the SQL instance for the database
+    This is a the SQL instance for the database.
 #>
 function Get-TargetResource
 {
@@ -34,10 +43,10 @@ function Get-TargetResource
         [System.String]
         $RecoveryModel,
 
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $ServerName,
+        $ServerName = $env:COMPUTERNAME,
 
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
@@ -83,19 +92,19 @@ function Get-TargetResource
 
 <#
     .SYNOPSIS
-    This function gets all Key properties defined in the resource schema file
+    This function gets all Key properties defined in the resource schema file.
 
     .PARAMETER Name
-    This is the SQL database
+    This is the SQL database.
 
     .PARAMETER RecoveryModel
-    This is the RecoveryModel of the SQL database
+    This is the RecoveryModel of the SQL database.
 
     .PARAMETER ServerName
-    This is a the SQL Server for the database
+    This is a the SQL Server for the database. Default value is $env:COMPUTERNAME.
 
     .PARAMETER InstanceName
-    This is a the SQL instance for the database
+    This is a the SQL instance for the database.
 #>
 function Set-TargetResource
 {
@@ -108,10 +117,10 @@ function Set-TargetResource
         [System.String]
         $RecoveryModel,
 
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $ServerName,
+        $ServerName = $env:COMPUTERNAME,
 
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
@@ -154,19 +163,19 @@ function Set-TargetResource
 
 <#
     .SYNOPSIS
-    This function gets all Key properties defined in the resource schema file
+    This function gets all Key properties defined in the resource schema file.
 
     .PARAMETER Name
-    This is the SQL database
+    This is the SQL database.
 
     .PARAMETER RecoveryModel
-    This is the RecoveryModel of the SQL database
+    This is the RecoveryModel of the SQL database.
 
     .PARAMETER ServerName
-    This is a the SQL Server for the database
+    This is a the SQL Server for the database. Default value is $env:COMPUTERNAME.
 
     .PARAMETER InstanceName
-    This is a the SQL instance for the database
+    This is a the SQL instance for the database.
 #>
 function Test-TargetResource
 {
@@ -180,10 +189,10 @@ function Test-TargetResource
         [System.String]
         $RecoveryModel,
 
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $ServerName,
+        $ServerName = $env:COMPUTERNAME,
 
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
@@ -204,7 +213,8 @@ function Test-TargetResource
 
     return Test-DscParameterState -CurrentValues $currentValues `
         -DesiredValues $PSBoundParameters `
-        -ValuesToCheck @('Name', 'RecoveryModel')
+        -ValuesToCheck @('Name', 'RecoveryModel') `
+        -TurnOffTypeChecking
 }
 
 Export-ModuleMember -Function *-TargetResource

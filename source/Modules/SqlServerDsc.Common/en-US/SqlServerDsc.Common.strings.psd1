@@ -1,13 +1,6 @@
 # Localized resources for helper module SqlServerDsc.Common.
 
 ConvertFrom-StringData @'
-    PropertyTypeInvalidForDesiredValues = Property 'DesiredValues' must be either a [System.Collections.Hashtable], [CimInstance] or [PSBoundParametersDictionary]. The type detected was {0}. (SQLCOMMON0001)
-    PropertyTypeInvalidForValuesToCheck = If 'DesiredValues' is a CimInstance, then property 'ValuesToCheck' must contain a value. (SQLCOMMON0002)
-    PropertyValidationError = Expected to find an array value for property {0} in the current values, but it was either not present or was null. This has caused the test method to return false. (SQLCOMMON0003)
-    PropertiesDoesNotMatch = Found an array for property {0} in the current values, but this array does not match the desired state. Details of the changes are below. (SQLCOMMON0004)
-    PropertyThatDoesNotMatch = {0} - {1} (SQLCOMMON0005)
-    ValueOfTypeDoesNotMatch = {0} value for property {1} does not match. Current state is '{2}' and desired state is '{3}'. (SQLCOMMON0006)
-    UnableToCompareProperty = Unable to compare property {0} as the type {1} is not handled by the Test-DscParameterState cmdlet. (SQLCOMMON0007)
     RobocopyIsCopying = Robocopy is copying media from source '{0}' to destination '{1}'. (SQLCOMMON0008)
     RobocopyUsingUnbufferedIo = Robocopy is using unbuffered I/O. (SQLCOMMON0009)
     RobocopyNotUsingUnbufferedIo = Unbuffered I/O cannot be used due to incompatible version of Robocopy. (SQLCOMMON0010)
@@ -34,7 +27,7 @@ ConvertFrom-StringData @'
     FailedToImportPowerShellSqlModule = Failed to import {0} module. (SQLCOMMON0031)
     GetSqlServerClusterResources = Getting cluster resource for SQL Server. (SQLCOMMON0032)
     GetSqlAgentClusterResource = Getting active cluster resource SQL Server Agent. (SQLCOMMON0033)
-    BringClusterResourcesOffline = Bringing the SQL Server resources {0} offline. (SQLCOMMON0034)
+    BringClusterResourcesOffline = Bringing the SQL Server resources '{0}' offline. (SQLCOMMON0034)
     BringSqlServerClusterResourcesOnline = Bringing the SQL Server resource back online. (SQLCOMMON0035)
     BringSqlServerAgentClusterResourcesOnline = Bringing the SQL Server Agent resource online. (SQLCOMMON0036)
     GetServiceInformation = Getting information about service '{0}'. (SQLCOMMON0037)
@@ -58,4 +51,8 @@ ConvertFrom-StringData @'
     ConnectingUsingImpersonation = Impersonate credential '{0}' with login type '{1}'. (SQLCOMMON0056)
     ExecuteQueryWithResults = Returning the results of the query `{0}`. (SQLCOMMON0057)
     ExecuteNonQuery = Executing the query `{0}`. (SQLCOMMON0058)
+    ClusterResourceNotFoundOrOffline = The SQL Server cluster resource '{0}' was not found or the resource has been taken offline. (SQLCOMMON0066)
+    NotOwnerOfClusterResource = The node '{0}' is not the owner of the cluster resource '{1}'. The owner is '{2}' so no restart is needed. (SQLCOMMON0067)
+    LoadedAssembly = Loaded the assembly '{0}'. (SQLCOMMON0068)
+    FailedToLoadAssembly = Failed to load the assembly '{0}'. (SQLCOMMON0069)
 '@

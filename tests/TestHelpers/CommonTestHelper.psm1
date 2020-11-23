@@ -224,8 +224,6 @@ function Get-NetIPAddressNetwork
     return $networkObject
 }
 
-
-
 <#
     .SYNOPSIS
         This command will create a new self-signed certificate to be used to
@@ -252,7 +250,6 @@ function New-SQLSelfSignedCertificate
         There are build workers still on Windows Server 2012 R2 so let's
         use the alternate method of New-SelfSignedCertificate.
     #>
-    Install-Module -Name 'PSPKI' -Scope 'CurrentUser' -Force
     Import-Module -Name 'PSPKI'
 
     $newSelfSignedCertificateExParameters = @{
@@ -276,14 +273,14 @@ function New-SQLSelfSignedCertificate
 
     # Update a machine and session environment variable with the path to the private certificate.
     [Environment]::SetEnvironmentVariable('SqlPrivateCertificatePath', $sqlPrivateCertificatePath, 'Machine')
-    Write-Verbose -Message ('Machine environment variable SqlPrivateCertificatePath set to ''{0}''' -f [System.Environment]::GetEnvironmentVariable('SqlPrivateCertificatePath','Machine'))
+    Write-Verbose -Message ('Machine environment variable SqlPrivateCertificatePath set to ''{0}''' -f [System.Environment]::GetEnvironmentVariable('SqlPrivateCertificatePath', 'Machine'))
 
     $env:SqlPrivateCertificatePath = $sqlPrivateCertificatePath
     Write-Verbose -Message ('Session environment variable $env:SqlPrivateCertificatePath set to ''{0}''' -f $env:SqlPrivateCertificatePath)
 
     # Update a machine and session environment variable with the thumbprint of the certificate.
     [Environment]::SetEnvironmentVariable('SqlCertificateThumbprint', $certificate.Thumbprint, 'Machine')
-    Write-Verbose -Message ('Machine environment variable $env:SqlCertificateThumbprint set to ''{0}''' -f [System.Environment]::GetEnvironmentVariable('SqlCertificateThumbprint','Machine'))
+    Write-Verbose -Message ('Machine environment variable $env:SqlCertificateThumbprint set to ''{0}''' -f [System.Environment]::GetEnvironmentVariable('SqlCertificateThumbprint', 'Machine'))
 
     $env:SqlCertificateThumbprint = $certificate.Thumbprint
     Write-Verbose -Message ('Session environment variable $env:SqlCertificateThumbprint set to ''{0}''' -f $env:SqlCertificateThumbprint)
@@ -298,7 +295,7 @@ function New-SQLSelfSignedCertificate
         in the parameter Type.
 
     .PARAMETER Name
-        Name of the test script that is called. Defaults to the name of the
+        Name of the test script that is called. Default value is the name of the
         calling script.
 
     .PARAMETER Type
@@ -385,4 +382,230 @@ function Test-ContinuousIntegrationTaskCategory
     }
 
     return $result
+}
+
+<#
+    .SYNOPSIS
+        Waits for LCM to become idle.
+
+    .NOTES
+        Used in integration test where integration tests run to quickly before
+        LCM have time to cool down.
+#>
+function Wait-ForIdleLcm
+{
+    [CmdletBinding()]
+    param ()
+
+    while ((Get-DscLocalConfigurationManager).LCMState -ne 'Idle')
+    {
+        Write-Verbose -Message 'Waiting for the LCM to become idle'
+
+        Start-Sleep -Seconds 2
+    }
+}
+
+<#
+    .SYNOPSIS
+        Returns an invalid operation exception object
+
+    .PARAMETER Message
+        The message explaining why this error is being thrown
+
+    .PARAMETER ErrorRecord
+        The error record containing the exception that is causing this terminating
+        error
+#>
+function Get-InvalidOperationRecord
+{
+    [CmdletBinding()]
+    param
+    (
+        [Parameter()]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $Message,
+
+        [Parameter()]
+        [ValidateNotNull()]
+        [System.Management.Automation.ErrorRecord]
+        $ErrorRecord
+    )
+
+    $newObjectParameters = @{
+        TypeName = 'System.InvalidOperationException'
+    }
+
+    if ($PSBoundParameters.ContainsKey('Message') -and $PSBoundParameters.ContainsKey('ErrorRecord'))
+    {
+        $newObjectParameters['ArgumentList'] = @(
+            $Message,
+            $ErrorRecord.Exception
+        )
+    }
+    elseif ($PSBoundParameters.ContainsKey('Message'))
+    {
+        $newObjectParameters['ArgumentList'] = @(
+            $Message
+        )
+    }
+
+    $invalidOperationException = New-Object @newObjectParameters
+
+    $newObjectParameters = @{
+        TypeName     = 'System.Management.Automation.ErrorRecord'
+        ArgumentList = @(
+            $invalidOperationException.ToString(),
+            'MachineStateIncorrect',
+            'InvalidOperation',
+            $null
+        )
+    }
+
+    return New-Object @newObjectParameters
+}
+
+<#
+    .SYNOPSIS
+        Returns an invalid result exception object
+
+    .PARAMETER Message
+        The message explaining why this error is being thrown
+
+    .PARAMETER ErrorRecord
+        The error record containing the exception that is causing this terminating
+        error
+#>
+function Get-InvalidResultRecord
+{
+    [CmdletBinding()]
+    param
+    (
+        [Parameter()]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $Message,
+
+        [Parameter()]
+        [ValidateNotNull()]
+        [System.Management.Automation.ErrorRecord]
+        $ErrorRecord
+    )
+
+    $newObjectParameters = @{
+        TypeName = 'System.Exception'
+    }
+
+    if ($PSBoundParameters.ContainsKey('Message') -and $PSBoundParameters.ContainsKey('ErrorRecord'))
+    {
+        $newObjectParameters['ArgumentList'] = @(
+            $Message,
+            $ErrorRecord.Exception
+        )
+    }
+    elseif ($PSBoundParameters.ContainsKey('Message'))
+    {
+        $newObjectParameters['ArgumentList'] = @(
+            $Message
+        )
+    }
+
+    $invalidOperationException = New-Object @newObjectParameters
+
+    $newObjectParameters = @{
+        TypeName     = 'System.Management.Automation.ErrorRecord'
+        ArgumentList = @(
+            $invalidOperationException.ToString(),
+            'MachineStateIncorrect',
+            'InvalidOperation',
+            $null
+        )
+    }
+
+    return New-Object @newObjectParameters
+}
+
+<#
+    .SYNOPSIS
+        Used to test arguments passed to Start-SqlSetupProcess while inside and It-block.
+
+        This function must be called inside a Mock, since it depends being run inside an It-block.
+
+    .PARAMETER Argument
+        A string containing all the arguments separated with space and each argument should start with '/'.
+        Only the first string in the array is evaluated.
+
+    .PARAMETER ExpectedArgument
+        A hash table containing all the expected arguments.
+#>
+function Test-SetupArgument
+{
+    param
+    (
+        [Parameter(Mandatory = $true)]
+        [System.String]
+        $Argument,
+
+        [Parameter(Mandatory = $true)]
+        [System.Collections.Hashtable]
+        $ExpectedArgument
+    )
+
+    $argumentHashTable = @{}
+
+    # Break the argument string into a hash table
+    ($Argument -split ' ?/') | ForEach-Object -Process {
+        <#
+            This regex must support different types of values, and no values:
+            /ENU /ACTION="Install" /FEATURES=SQLENGINE /SQLSYSADMINACCOUNTS="COMPANY\sqladmin" "COMPANY\SQLAdmins" /FailoverClusterDisks="Backup; SysData; TempDbData; TempDbLogs; UserData; UserLogs"
+        #>
+        if ($_ -imatch '(\w+)(=([^\/]+)"?)?')
+        {
+            $key = $Matches[1]
+            if ($key -in @('FailoverClusterDisks', 'FailoverClusterIPAddresses'))
+            {
+                $value = ($Matches[3] -replace '" "', '; ') -replace '"', ''
+            }
+            elseif ($key -in @('SkipRules'))
+            {
+                # Do no transformation.
+                $value = $Matches[3]
+            }
+            else
+            {
+                $value = ($Matches[3] -replace '" "', ' ') -replace '"', ''
+            }
+
+            $argumentHashTable.Add($key, $value)
+        }
+    }
+
+    $actualValues = $argumentHashTable.Clone()
+
+    # Limit the output in the console when everything is fine.
+    if ($actualValues.Count -ne $ExpectedArgument.Count)
+    {
+        Write-Warning -Message 'Verified the setup argument count (expected vs actual)'
+        Write-Warning -Message ('Expected: {0}' -f ($ExpectedArgument.Keys -join ','))
+        Write-Warning -Message ('Actual: {0}' -f ($actualValues.Keys -join ','))
+    }
+
+    # Start by checking whether we have the same number of parameters
+    $actualValues.Count | Should -Be $ExpectedArgument.Count `
+        -Because ('the expected arguments was: {0}' -f ($ExpectedArgument.Keys -join ','))
+
+    Write-Verbose -Message 'Verified actual setup argument values against expected setup argument values' -Verbose
+
+    foreach ($argumentKey in $ExpectedArgument.Keys)
+    {
+        $argumentKeyName = $actualValues.GetEnumerator() |
+            Where-Object -FilterScript {
+                $_.Name -eq $argumentKey
+            } | Select-Object -ExpandProperty 'Name'
+
+        $argumentKeyName | Should -Be $argumentKey -Because 'the argument should have been included when setup.exe was called'
+
+        $argumentValue = $actualValues.$argumentKey
+        $argumentValue | Should -Be $ExpectedArgument.$argumentKey -Because 'the argument should have been set to the correct value when calling setup.exe'
+    }
 }

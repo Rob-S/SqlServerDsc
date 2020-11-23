@@ -16,6 +16,12 @@ to each other. Dependencies are made to speed up the testing.**
 
 ## SqlSetup
 
+Installs the Database Engine, Analysis Service for both SQL Server 2016
+and SQL Server 2017 in two different Azure Pipelines jobs with the configuration
+names `'Integration_SQL2016'` and `'Integration_SQL2017'`. It will also
+install the Reporting Services 2016 in the Azure Pipelines job with the configuration
+name `'Integration_SQL2016'`.
+
 **Run order:** 1
 
 **Depends on:** None
@@ -31,7 +37,8 @@ MSSQLSERVER | SQLENGINE,CONN,BC,SDK | - | Stopped
 
 All running Database Engine instances also have a SQL Server Agent that is started.
 
-The instance DSCSQLTEST support mixed authentication mode.
+The instance DSCSQLTEST support mixed authentication mode, and will have
+both Named Pipes and TCP/IP protocol enabled.
 
 >**Note:** Some services are stopped to save memory on the build worker. See the
 >column *State*.
@@ -66,6 +73,9 @@ with this user and that means that this user must have permission to access the
 properties `IsClustered` and `IsHadrEnable`.*
 
 ## SqlRSSetup
+
+Installs SQL Server 2017 Reporting Services in Azure Pipelines job with the
+configuration name `'Integration_SQL2017'`.
 
 **Run order:** 2
 
@@ -144,7 +154,7 @@ The integration test will leave a database for other integration tests to
 use.
 
 Database | Collation
---- | --- | ---
+--- | ---
 Database1 | Finnish_Swedish_CI_AS
 
 ## SqlDatabaseDefaultLocation
@@ -160,7 +170,7 @@ Data | Log | Backup
 --- | --- | ---
 C:\SQLData | C:\SQLLog | C:\Backups
 
-## SqlServerLogin
+## SqlLogin
 
 **Run order:** 2
 
@@ -213,7 +223,7 @@ worker.*
 *The integration tests will clean up and not leave anything on the build
 worker.*
 
-## SqlServerDatabaseMail
+## SqlDatabaseMail
 
 **Run order:** 2
 
@@ -222,16 +232,7 @@ worker.*
 *The integration tests will clean up and not leave anything on the build
 worker.*
 
-## SqlServerEndpoint
-
-**Run order:** 2
-
-**Depends on:** SqlSetup
-
-*The integration tests will clean up and not leave anything on the build
-worker.*
-
-## SqlServerNetwork
+## SqlEndpoint
 
 **Run order:** 2
 
@@ -250,6 +251,10 @@ worker.*
 worker.*
 
 ## SqlRS
+
+Configures _SQL Server Reporting Services 2016_ and _SQL Server Reporting_
+_Services 2017_ in two different Azure Pipelines jobs with the configuration
+names `'Integration_SQL2016'` and `'Integration_SQL2017'`.
 
 **Run order:** 3
 
@@ -277,11 +282,11 @@ DSCRS2016 | RS | The Reporting Services is initialized, and in a working state.
 - **DatabaseServerName:** `$env:COMPUTERNAME`
 - **DatabaseInstanceName:** DSCSQLTEST
 
-## SqlServerRole
+## SqlRole
 
 **Run order:** 3
 
-**Depends on:** SqlSetup, SqlServerLogin
+**Depends on:** SqlSetup, SqlLogin
 
 The integration test will keep the following server roles on the SQL Server instance
 **DSCSQLTEST**.
@@ -295,7 +300,7 @@ DscServerRole2 | DscUser4
 
 **Run order:** 3
 
-**Depends on:** SqlSetup, SqlServerLogin, SqlDatabase
+**Depends on:** SqlSetup, SqlLogin, SqlDatabase
 
 The integration test will leave these database users for other integration tests
 to use.
@@ -330,6 +335,25 @@ tests to use.
 Name | Algorithm | Password
 --- | --- | ---
 AsymmetricKey1 | RSA_2048 | P@ssw0rd1
+
+## SqlDatabasePermission
+
+**Run order:** 4
+
+**Depends on:** SqlDatabaseUser
+
+The integration test will not leave anything on any instance.
+
+## SqlReplication
+
+**Run order:** 3
+
+**Depends on:** SqlSetup
+
+This integration tests depends on that the default instance (`MSSQLSERVER`)
+and the named instance `DSCSQLTEST` have the feature `REPLICATION` installed.
+
+The integration test will not leave anything on any instance.
 
 ## SqlScript
 
@@ -373,7 +397,7 @@ Database name | Owner
 ScriptDatabase3 | $env:COMPUTERNAME\SqlAdmin
 ScriptDatabase4 | DscAdmin1
 
-## SqlServerSecureConnection
+## SqlSecureConnection
 
 **Run order:** 5
 
@@ -381,3 +405,44 @@ ScriptDatabase4 | DscAdmin1
 
 *The integration tests will clean up and not leave anything on the build
 worker.*
+
+## SqlProtocol
+
+**Run order:** 5
+
+**Depends on:** SqlSetup
+
+Depends that the instance `DSCSQLTEST` have the Named Pipes protocol
+enabled (SqlSetup is run with `NpEnabled = $true`).
+
+*The integration tests will clean up and not leave anything on the build
+worker.*
+
+## SqlProtocolTcpIp
+
+**Run order:** 6
+
+**Depends on:** SqlSetup
+
+*The integration tests will clean up and not leave anything on the build
+worker.*
+
+## SqlDatabaseObjectPermission
+
+**Run order:** 6
+
+**Depends on:** SqlSetup, SqlDatabase (and uses SqlScriptQuery)
+
+The integration test will leave these database objects for other integration tests
+to use.
+
+Database | Object Name | Object Type | Schema
+--- | --- | --- | ---
+Database1 | Table1 | Table | dbo
+
+The integration test will leave these user permissions for database objects
+for other integration tests to use.
+
+User name | Database | Object Name | Permission
+--- | --- | --- | ---
+User1 | Database1 | Table1 | Select

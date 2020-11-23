@@ -21,17 +21,9 @@
 
     # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
     FunctionsToExport = @(
-        'New-InvalidArgumentException'
-        'New-InvalidOperationException'
-        'New-ObjectNotFoundException'
-        'New-InvalidResultException'
-        'New-NotImplementedException'
-        'Get-LocalizedData'
-        'Test-DscParameterState'
         'Get-RegistryPropertyValue'
         'Format-Path'
         'Copy-ItemWithRobocopy'
-        'Get-TemporaryFolder'
         'Invoke-InstallationMediaCopy'
         'Connect-UncPath'
         'Disconnect-UncPath'
@@ -55,7 +47,14 @@
         'Invoke-SqlScript'
         'Get-ServiceAccount'
         'Find-ExceptionByNumber'
-
+        'Compare-ResourcePropertyState'
+        'Test-DscPropertyState'
+        'Get-ProtocolNameProperties'
+        'Get-ServerProtocolObject'
+        'Import-Assembly'
+        'Set-PSModulePath'
+        'ConvertTo-ServerInstanceName'
+        'Get-FilePathMajorVersion'
     )
 
     # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.

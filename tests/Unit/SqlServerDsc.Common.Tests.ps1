@@ -1,11 +1,6 @@
 <#
     .SYNOPSIS
         Automated unit test for helper functions in module SqlServerDsc.Common.
-
-    .NOTES
-        To run this script locally, please make sure to first run the bootstrap
-        script. Read more at
-        https://github.com/PowerShell/SqlServerDsc/blob/dev/CONTRIBUTING.md#bootstrap-script-assert-testenvironment
 #>
 
 Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath '..\TestHelpers\CommonTestHelper.psm1')
@@ -15,21 +10,18 @@ if (-not (Test-BuildCategory -Type 'Unit'))
     return
 }
 
+$script:dscModuleName = 'SqlServerDsc'
+$script:subModuleName = 'SqlServerDsc.Common'
+
 #region HEADER
-$script:projectPath = "$PSScriptRoot\..\.." | Convert-Path
-$script:projectName = (Get-ChildItem -Path "$script:projectPath\*\*.psd1" | Where-Object -FilterScript {
-        ($_.Directory.Name -match 'source|src' -or $_.Directory.Name -eq $_.BaseName) -and
-        $(try { Test-ModuleManifest -Path $_.FullName -ErrorAction Stop } catch { $false })
-    }).BaseName
+Remove-Module -Name $script:subModuleName -Force -ErrorAction 'SilentlyContinue'
 
-$script:parentModule = Get-Module -Name $script:projectName -ListAvailable | Select-Object -First 1
+$script:parentModule = Get-Module -Name $script:dscModuleName -ListAvailable | Select-Object -First 1
 $script:subModulesFolder = Join-Path -Path $script:parentModule.ModuleBase -ChildPath 'Modules'
-Remove-Module -Name $script:parentModule -Force -ErrorAction 'SilentlyContinue'
 
-$script:subModuleName = (Split-Path -Path $PSCommandPath -Leaf) -replace '\.Tests.ps1'
-$script:subModuleFile = Join-Path -Path $script:subModulesFolder -ChildPath "$($script:subModuleName)"
+$script:subModulePath = Join-Path -Path $script:subModulesFolder -ChildPath $script:subModuleName
 
-Import-Module $script:subModuleFile -Force -ErrorAction Stop
+Import-Module -Name $script:subModulePath -Force -ErrorAction 'Stop'
 #endregion HEADER
 
 # Loading mocked classes
@@ -40,398 +32,6 @@ Add-Type -Path (Join-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath 'Stubs
 Import-SQLModuleStub
 
 InModuleScope $script:subModuleName {
-    Describe 'SqlServerDsc.Common\Test-DscParameterState' -Tag 'TestDscParameterState' {
-        Context -Name 'When passing values' -Fixture {
-            It 'Should return true for two identical tables' {
-                $mockDesiredValues = @{
-                    Example = 'test'
-                }
-
-                $testParameters = @{
-                    CurrentValues = $mockDesiredValues
-                    DesiredValues = $mockDesiredValues
-                }
-
-                Test-DscParameterState @testParameters | Should -Be $true
-            }
-
-            It 'Should return false when a value is different for [System.String]' {
-                $mockCurrentValues = @{
-                    Example = [System.String] 'something'
-                }
-
-                $mockDesiredValues = @{
-                    Example = [System.String] 'test'
-                }
-
-                $testParameters = @{
-                    CurrentValues = $mockCurrentValues
-                    DesiredValues = $mockDesiredValues
-                }
-
-                Test-DscParameterState @testParameters | Should -Be $false
-            }
-
-            It 'Should return false when a value is different for [System.Int32]' {
-                $mockCurrentValues = @{
-                    Example = [System.Int32] 1
-                }
-
-                $mockDesiredValues = @{
-                    Example = [System.Int32] 2
-                }
-
-                $testParameters = @{
-                    CurrentValues = $mockCurrentValues
-                    DesiredValues = $mockDesiredValues
-                }
-
-                Test-DscParameterState @testParameters | Should -Be $false
-            }
-
-            It 'Should return false when a value is different for [Int16]' {
-                $mockCurrentValues = @{
-                    Example = [System.Int16] 1
-                }
-
-                $mockDesiredValues = @{
-                    Example = [System.Int16] 2
-                }
-
-                $testParameters = @{
-                    CurrentValues = $mockCurrentValues
-                    DesiredValues = $mockDesiredValues
-                }
-
-                Test-DscParameterState @testParameters | Should -Be $false
-            }
-
-            It 'Should return false when a value is different for [UInt16]' {
-                $mockCurrentValues = @{
-                    Example = [System.UInt16] 1
-                }
-
-                $mockDesiredValues = @{
-                    Example = [System.UInt16] 2
-                }
-
-                $testParameters = @{
-                    CurrentValues = $mockCurrentValues
-                    DesiredValues = $mockDesiredValues
-                }
-
-                Test-DscParameterState @testParameters | Should -Be $false
-            }
-
-            It 'Should return false when a value is different for [Boolean]' {
-                $mockCurrentValues = @{
-                    Example = [System.Boolean] $true
-                }
-
-                $mockDesiredValues = @{
-                    Example = [System.Boolean] $false
-                }
-
-                $testParameters = @{
-                    CurrentValues = $mockCurrentValues
-                    DesiredValues = $mockDesiredValues
-                }
-
-                Test-DscParameterState @testParameters | Should -Be $false
-            }
-
-            It 'Should return false when a value is missing' {
-                $mockCurrentValues = @{}
-                $mockDesiredValues = @{
-                    Example = 'test'
-                }
-
-                $testParameters = @{
-                    CurrentValues = $mockCurrentValues
-                    DesiredValues = $mockDesiredValues
-                }
-
-                Test-DscParameterState @testParameters | Should -Be $false
-            }
-
-            It 'Should return true when only a specified value matches, but other non-listed values do not' {
-                $mockCurrentValues = @{
-                    Example = 'test'
-                    SecondExample = 'true'
-                }
-
-                $mockDesiredValues = @{
-                    Example = 'test'
-                    SecondExample = 'false'
-                }
-
-                $testParameters = @{
-                    CurrentValues = $mockCurrentValues
-                    DesiredValues = $mockDesiredValues
-                    ValuesToCheck = @('Example')
-                }
-
-                Test-DscParameterState @testParameters | Should -Be $true
-            }
-
-            It 'Should return false when only specified values do not match, but other non-listed values do ' {
-                $mockCurrentValues = @{
-                    Example = 'test'
-                    SecondExample = 'true'
-                }
-
-                $mockDesiredValues = @{
-                    Example = 'test'
-                    SecondExample = 'false'
-                }
-
-                $testParameters = @{
-                    CurrentValues = $mockCurrentValues
-                    DesiredValues = $mockDesiredValues
-                    ValuesToCheck = @('SecondExample')
-                }
-
-                Test-DscParameterState @testParameters | Should -Be $false
-            }
-
-            It 'Should return false when an empty hash table is used in the current values' {
-                $mockCurrentValues = @{}
-                $mockDesiredValues = @{
-                    Example = 'test'
-                    SecondExample = 'false'
-                }
-
-                $testParameters = @{
-                    CurrentValues = $mockCurrentValues
-                    DesiredValues = $mockDesiredValues
-                }
-
-                Test-DscParameterState @testParameters | Should -Be $false
-            }
-
-            It 'Should return true when evaluating a table against a CimInstance' {
-                $mockCurrentValues = @{
-                    Handle = '0'
-                    ProcessId = '1000'
-                }
-
-                $mockWin32ProcessProperties = @{
-                    Handle = 0
-                    ProcessId = 1000
-                }
-
-                $mockNewCimInstanceParameters = @{
-                    ClassName = 'Win32_Process'
-                    Property = $mockWin32ProcessProperties
-                    Key = 'Handle'
-                    ClientOnly = $true
-                }
-
-                $mockDesiredValues = New-CimInstance @mockNewCimInstanceParameters
-
-                $testParameters = @{
-                    CurrentValues = $mockCurrentValues
-                    DesiredValues = $mockDesiredValues
-                    ValuesToCheck = @('Handle','ProcessId')
-                }
-
-                Test-DscParameterState @testParameters | Should -Be $true
-            }
-
-            It 'Should return false when evaluating a table against a CimInstance and a value is wrong' {
-                $mockCurrentValues = @{
-                    Handle = '1'
-                    ProcessId = '1000'
-                }
-
-                $mockWin32ProcessProperties = @{
-                    Handle = 0
-                    ProcessId = 1000
-                }
-
-                $mockNewCimInstanceParameters = @{
-                    ClassName = 'Win32_Process'
-                    Property = $mockWin32ProcessProperties
-                    Key = 'Handle'
-                    ClientOnly = $true
-                }
-
-                $mockDesiredValues = New-CimInstance @mockNewCimInstanceParameters
-
-                $testParameters = @{
-                    CurrentValues = $mockCurrentValues
-                    DesiredValues = $mockDesiredValues
-                    ValuesToCheck = @('Handle','ProcessId')
-                }
-
-                Test-DscParameterState @testParameters | Should -Be $false
-            }
-
-            It 'Should return true when evaluating a hash table containing an array' {
-                $mockCurrentValues = @{
-                    Example = 'test'
-                    SecondExample = @('1','2')
-                }
-
-                $mockDesiredValues = @{
-                    Example = 'test'
-                    SecondExample = @('1','2')
-                }
-
-                $testParameters = @{
-                    CurrentValues = $mockCurrentValues
-                    DesiredValues = $mockDesiredValues
-                }
-
-                Test-DscParameterState @testParameters | Should -Be $true
-            }
-
-            It 'Should return false when evaluating a hash table containing an array with wrong values' {
-                $mockCurrentValues = @{
-                    Example = 'test'
-                    SecondExample = @('A','B')
-                }
-
-                $mockDesiredValues = @{
-                    Example = 'test'
-                    SecondExample = @('1','2')
-                }
-
-                $testParameters = @{
-                    CurrentValues = $mockCurrentValues
-                    DesiredValues = $mockDesiredValues
-                }
-
-                Test-DscParameterState @testParameters | Should -Be $false
-            }
-
-            It 'Should return false when evaluating a hash table containing an array, but the CurrentValues are missing an array' {
-                $mockCurrentValues = @{
-                    Example = 'test'
-                }
-
-                $mockDesiredValues = @{
-                    Example = 'test'
-                    SecondExample = @('1','2')
-                }
-
-                $testParameters = @{
-                    CurrentValues = $mockCurrentValues
-                    DesiredValues = $mockDesiredValues
-                }
-
-                Test-DscParameterState @testParameters | Should -Be $false
-            }
-
-            It 'Should return false when evaluating a hash table containing an array, but the property i CurrentValues is $null' {
-                $mockCurrentValues = @{
-                    Example = 'test'
-                    SecondExample = $null
-                }
-
-                $mockDesiredValues = @{
-                    Example = 'test'
-                    SecondExample = @('1','2')
-                }
-
-                $testParameters = @{
-                    CurrentValues = $mockCurrentValues
-                    DesiredValues = $mockDesiredValues
-                }
-
-                Test-DscParameterState @testParameters | Should -Be $false
-            }
-        }
-
-        Context -Name 'When passing invalid types for DesiredValues' -Fixture {
-            It 'Should throw the correct error when DesiredValues is of wrong type' {
-                $mockCurrentValues = @{
-                    Example = 'something'
-                }
-
-                $mockDesiredValues = 'NotHashTable'
-
-                $testParameters = @{
-                    CurrentValues = $mockCurrentValues
-                    DesiredValues = $mockDesiredValues
-                }
-
-                $mockCorrectErrorMessage = ($script:localizedData.PropertyTypeInvalidForDesiredValues -f $testParameters.DesiredValues.GetType().Name)
-                { Test-DscParameterState @testParameters } | Should -Throw $mockCorrectErrorMessage
-            }
-
-            It 'Should write a warning when DesiredValues contain an unsupported type' {
-                Mock -CommandName Write-Warning -Verifiable
-
-                # This is a dummy type to test with a type that could never be a correct one.
-                class MockUnknownType
-                {
-                    [ValidateNotNullOrEmpty()]
-                    [System.String]
-                    $Property1
-
-                    [ValidateNotNullOrEmpty()]
-                    [System.String]
-                    $Property2
-
-                    MockUnknownType()
-                    {
-                    }
-                }
-
-                $mockCurrentValues = @{
-                    Example = New-Object -TypeName MockUnknownType
-                }
-
-                $mockDesiredValues = @{
-                    Example = New-Object -TypeName MockUnknownType
-                }
-
-                $testParameters = @{
-                    CurrentValues = $mockCurrentValues
-                    DesiredValues = $mockDesiredValues
-                }
-
-                Test-DscParameterState @testParameters | Should -Be $false
-
-                Assert-MockCalled -CommandName Write-Warning -Exactly -Times 1
-            }
-        }
-
-        Context -Name 'When passing an CimInstance as DesiredValue and ValuesToCheck is $null' -Fixture {
-            It 'Should throw the correct error' {
-                $mockCurrentValues = @{
-                    Example = 'something'
-                }
-
-                $mockWin32ProcessProperties = @{
-                    Handle = 0
-                    ProcessId = 1000
-                }
-
-                $mockNewCimInstanceParameters = @{
-                    ClassName = 'Win32_Process'
-                    Property = $mockWin32ProcessProperties
-                    Key = 'Handle'
-                    ClientOnly = $true
-                }
-
-                $mockDesiredValues = New-CimInstance @mockNewCimInstanceParameters
-
-                $testParameters = @{
-                    CurrentValues = $mockCurrentValues
-                    DesiredValues = $mockDesiredValues
-                    ValuesToCheck = $null
-                }
-
-                $mockCorrectErrorMessage = $script:localizedData.PropertyTypeInvalidForValuesToCheck
-                { Test-DscParameterState @testParameters } | Should -Throw $mockCorrectErrorMessage
-            }
-        }
-
-        Assert-VerifiableMock
-    }
-
     Describe 'SqlServerDsc.Common\Get-RegistryPropertyValue' -Tag 'GetRegistryPropertyValue' {
         BeforeAll {
             $mockWrongRegistryPath = 'HKLM:\SOFTWARE\AnyPath'
@@ -587,8 +187,8 @@ InModuleScope $script:subModuleName {
 
         Context 'When Copy-ItemWithRobocopy is called it should return the correct arguments' {
             BeforeEach {
-                Mock -CommandName Get-Command -MockWith $mockGetCommand -Verifiable
-                Mock -CommandName Start-Process -MockWith $mockStartSqlSetupProcess_Robocopy -Verifiable
+                Mock -CommandName Get-Command -MockWith $mockGetCommand
+                Mock -CommandName Start-Process -MockWith $mockStartSqlSetupProcess_Robocopy
                 $mockRobocopyArgumentSourcePathQuoted = '"{0}"' -f $mockRobocopyArgumentSourcePath
                 $mockRobocopyArgumentDestinationPathQuoted = '"{0}"' -f $mockRobocopyArgumentDestinationPath
             }
@@ -640,11 +240,33 @@ InModuleScope $script:subModuleName {
         }
 
         Context 'When Copy-ItemWithRobocopy throws an exception it should return the correct error messages' {
+            BeforeAll {
+                $mockRobocopyArgumentSourcePath = 'C:\Source\SQL2016'
+                $mockRobocopyArgumentDestinationPath = 'D:\Temp\DSCSQL2016'
+                $mockRobocopyExecutableName = 'Robocopy.exe'
+                $mockRobocopyExecutableVersion = ''     # Set dynamically during runtime
+            }
+
             BeforeEach {
                 $mockRobocopyExecutableVersion = $mockRobocopyExecutableVersionWithUnbufferedIO
 
-                Mock -CommandName Get-Command -MockWith $mockGetCommand -Verifiable
-                Mock -CommandName Start-Process -MockWith $mockStartSqlSetupProcess_Robocopy_WithExitCode -Verifiable
+                Mock -CommandName Get-Command -MockWith {
+                    return @(
+                        (
+                            New-Object -TypeName Object |
+                                Add-Member -MemberType NoteProperty -Name 'Name' -Value $mockRobocopyExecutableName -PassThru |
+                                Add-Member -MemberType ScriptProperty -Name FileVersionInfo -Value {
+                                    return @( ( New-Object -TypeName Object |
+                                            Add-Member -MemberType NoteProperty -Name 'ProductVersion' -Value $mockRobocopyExecutableVersion -PassThru -Force
+                                        ) )
+                                } -PassThru -Force
+                        )
+                    )
+                }
+                Mock -CommandName Start-Process -MockWith {
+                    return New-Object -TypeName Object |
+                                Add-Member -MemberType NoteProperty -Name 'ExitCode' -Value $mockStartSqlSetupProcessExitCode -PassThru -Force
+                }
             }
 
             It 'Should throw the correct error message when error code is 8' {
@@ -655,7 +277,13 @@ InModuleScope $script:subModuleName {
                     DestinationPath = $mockRobocopyArgumentDestinationPath
                 }
 
-                { Copy-ItemWithRobocopy @copyItemWithRobocopyParameter } | Should -Throw "Robocopy reported errors when copying files. Error code: $mockStartSqlSetupProcessExitCode."
+                $mockErrorMessage = Get-InvalidOperationRecord -Message (
+                    $script:localizedData.RobocopyErrorCopying -f $mockStartSqlSetupProcessExitCode
+                )
+
+                $mockErrorMessage.Exception.Message | Should -Not -BeNullOrEmpty
+
+                { Copy-ItemWithRobocopy @copyItemWithRobocopyParameter } | Should -Throw -ExpectedMessage $mockErrorMessage
 
                 Assert-MockCalled -CommandName Get-Command -Exactly -Times 1 -Scope It
                 Assert-MockCalled -CommandName Start-Process -Exactly -Times 1 -Scope It
@@ -669,7 +297,13 @@ InModuleScope $script:subModuleName {
                     DestinationPath = $mockRobocopyArgumentDestinationPath
                 }
 
-                { Copy-ItemWithRobocopy @copyItemWithRobocopyParameter } | Should -Throw "Robocopy reported errors when copying files. Error code: $mockStartSqlSetupProcessExitCode."
+                $mockErrorMessage = Get-InvalidOperationRecord -Message (
+                    $script:localizedData.RobocopyErrorCopying -f $mockStartSqlSetupProcessExitCode
+                )
+
+                $mockErrorMessage.Exception.Message | Should -Not -BeNullOrEmpty
+
+                { Copy-ItemWithRobocopy @copyItemWithRobocopyParameter } | Should -Throw -ExpectedMessage $mockErrorMessage
 
                 Assert-MockCalled -CommandName Get-Command -Exactly -Times 1 -Scope It
                 Assert-MockCalled -CommandName Start-Process -Exactly -Times 1 -Scope It
@@ -683,7 +317,13 @@ InModuleScope $script:subModuleName {
                     DestinationPath = $mockRobocopyArgumentDestinationPath
                 }
 
-                { Copy-ItemWithRobocopy @copyItemWithRobocopyParameter } | Should -Throw "Robocopy reported that failures occurred when copying files. Error code: $mockStartSqlSetupProcessExitCode."
+                $mockErrorMessage = Get-InvalidResultRecord -Message (
+                    $script:localizedData.RobocopyFailuresCopying -f $mockStartSqlSetupProcessExitCode
+                )
+
+                $mockErrorMessage | Should -Not -BeNullOrEmpty
+
+                { Copy-ItemWithRobocopy @copyItemWithRobocopyParameter } | Should -Throw -ExpectedMessage $mockErrorMessage
 
                 Assert-MockCalled -CommandName Get-Command -Exactly -Times 1 -Scope It
                 Assert-MockCalled -CommandName Start-Process -Exactly -Times 1 -Scope It
@@ -694,8 +334,8 @@ InModuleScope $script:subModuleName {
             BeforeEach {
                 $mockRobocopyExecutableVersion = $mockRobocopyExecutableVersionWithUnbufferedIO
 
-                Mock -CommandName Get-Command -MockWith $mockGetCommand -Verifiable
-                Mock -CommandName Start-Process -MockWith $mockStartSqlSetupProcess_Robocopy_WithExitCode -Verifiable
+                Mock -CommandName Get-Command -MockWith $mockGetCommand
+                Mock -CommandName Start-Process -MockWith $mockStartSqlSetupProcess_Robocopy_WithExitCode
             }
 
             AfterEach {
@@ -747,8 +387,8 @@ InModuleScope $script:subModuleName {
             BeforeEach {
                 $mockRobocopyExecutableVersion = $mockRobocopyExecutableVersionWithUnbufferedIO
 
-                Mock -CommandName Get-Command -MockWith $mockGetCommand -Verifiable
-                Mock -CommandName Start-Process -MockWith $mockStartSqlSetupProcess_Robocopy_WithExitCode -Verifiable
+                Mock -CommandName Get-Command -MockWith $mockGetCommand
+                Mock -CommandName Start-Process -MockWith $mockStartSqlSetupProcess_Robocopy_WithExitCode
             }
 
             AfterEach {
@@ -793,24 +433,10 @@ InModuleScope $script:subModuleName {
         }
     }
 
-    Describe 'SqlServerDsc.Common\Get-TemporaryFolder' -Tag 'GetTemporaryFolder' {
-        BeforeAll {
-            $mockExpectedTempPath = [IO.Path]::GetTempPath()
-        }
-
-        Context 'When using Get-TemporaryFolder' {
-            It 'Should return the correct temporary path' {
-                Get-TemporaryFolder | Should -BeExactly $mockExpectedTempPath
-            }
-        }
-    }
-
     Describe 'SqlServerDsc.Common\Invoke-InstallationMediaCopy' -Tag 'InvokeInstallationMediaCopy' {
         BeforeAll {
-            $mockSourcePathUNC = '\\server\share'
-            $mockSourcePathUNCWithLeaf = '\\server\share\leaf'
             $mockSourcePathGuid = 'cc719562-0f46-4a16-8605-9f8a47c70402'
-            $mockDestinationPath = 'TestDrive:\'
+            $mockDestinationPath = 'C:\Users\user\AppData\Local\Temp'
 
             $mockShareCredentialUserName = 'COMPANY\SqlAdmin'
             $mockShareCredentialPassword = 'dummyPassW0rd'
@@ -836,6 +462,10 @@ InModuleScope $script:subModuleName {
         }
 
         Context 'When invoking installation media copy, using SourcePath containing leaf' {
+            BeforeAll {
+                $mockSourcePathUNCWithLeaf = '\\server\share\leaf'
+            }
+
             It 'Should call the correct mocks' {
                 {
                     $invokeInstallationMediaCopyParameters = @{
@@ -846,11 +476,11 @@ InModuleScope $script:subModuleName {
                     Invoke-InstallationMediaCopy @invokeInstallationMediaCopyParameters
                 } | Should -Not -Throw
 
-                Assert-MockCalled -CommandName Connect-UncPath -Exactly -Times 1 -Scope 'It'
-                Assert-MockCalled -CommandName New-Guid -Exactly -Times 0 -Scope 'It'
-                Assert-MockCalled -CommandName Get-TemporaryFolder -Exactly -Times 1 -Scope 'It'
-                Assert-MockCalled -CommandName Copy-ItemWithRobocopy -Exactly -Times 1 -Scope 'It'
-                Assert-MockCalled -CommandName Disconnect-UncPath -Exactly -Times 1 -Scope 'It'
+                Assert-MockCalled -CommandName Connect-UncPath -Exactly -Times 1 -Scope It
+                Assert-MockCalled -CommandName New-Guid -Exactly -Times 0 -Scope It
+                Assert-MockCalled -CommandName Get-TemporaryFolder -Exactly -Times 1 -Scope It
+                Assert-MockCalled -CommandName Copy-ItemWithRobocopy -Exactly -Times 1 -Scope It
+                Assert-MockCalled -CommandName Disconnect-UncPath -Exactly -Times 1 -Scope It
             }
 
             It 'Should return the correct destination path' {
@@ -862,11 +492,50 @@ InModuleScope $script:subModuleName {
 
                 $invokeInstallationMediaCopyResult = Invoke-InstallationMediaCopy @invokeInstallationMediaCopyParameters
 
-                $invokeInstallationMediaCopyResult | Should -Be ('{0}leaf' -f $mockDestinationPath)
+                $invokeInstallationMediaCopyResult | Should -Be ('{0}\leaf' -f $mockDestinationPath)
+            }
+        }
+
+        Context 'When invoking installation media copy, using SourcePath containing a second leaf' {
+            BeforeAll {
+                $mockSourcePathUNCWithLeaf = '\\server\share\leaf\secondleaf'
+            }
+
+            It 'Should call the correct mocks' {
+                {
+                    $invokeInstallationMediaCopyParameters = @{
+                        SourcePath = $mockSourcePathUNCWithLeaf
+                        SourceCredential = $mockShareCredential
+                    }
+
+                    Invoke-InstallationMediaCopy @invokeInstallationMediaCopyParameters
+                } | Should -Not -Throw
+
+                Assert-MockCalled -CommandName Connect-UncPath -Exactly -Times 1 -Scope It
+                Assert-MockCalled -CommandName New-Guid -Exactly -Times 0 -Scope It
+                Assert-MockCalled -CommandName Get-TemporaryFolder -Exactly -Times 1 -Scope It
+                Assert-MockCalled -CommandName Copy-ItemWithRobocopy -Exactly -Times 1 -Scope It
+                Assert-MockCalled -CommandName Disconnect-UncPath -Exactly -Times 1 -Scope It
+            }
+
+            It 'Should return the correct destination path' {
+                $invokeInstallationMediaCopyParameters = @{
+                    SourcePath = $mockSourcePathUNCWithLeaf
+                    SourceCredential = $mockShareCredential
+                    PassThru = $true
+                }
+
+                $invokeInstallationMediaCopyResult = Invoke-InstallationMediaCopy @invokeInstallationMediaCopyParameters
+
+                $invokeInstallationMediaCopyResult | Should -Be ('{0}\secondleaf' -f $mockDestinationPath)
             }
         }
 
         Context 'When invoking installation media copy, using SourcePath without a leaf' {
+            BeforeAll {
+                $mockSourcePathUNC = '\\server\share'
+            }
+
             It 'Should call the correct mocks' {
                 {
                     $invokeInstallationMediaCopyParameters = @{
@@ -877,11 +546,11 @@ InModuleScope $script:subModuleName {
                     Invoke-InstallationMediaCopy @invokeInstallationMediaCopyParameters
                 } | Should -Not -Throw
 
-                Assert-MockCalled -CommandName Connect-UncPath -Exactly -Times 1 -Scope 'It'
-                Assert-MockCalled -CommandName New-Guid -Exactly -Times 1 -Scope 'It'
-                Assert-MockCalled -CommandName Get-TemporaryFolder -Exactly -Times 1 -Scope 'It'
-                Assert-MockCalled -CommandName Copy-ItemWithRobocopy -Exactly -Times 1 -Scope 'It'
-                Assert-MockCalled -CommandName Disconnect-UncPath -Exactly -Times 1 -Scope 'It'
+                Assert-MockCalled -CommandName Connect-UncPath -Exactly -Times 1 -Scope It
+                Assert-MockCalled -CommandName New-Guid -Exactly -Times 1 -Scope It
+                Assert-MockCalled -CommandName Get-TemporaryFolder -Exactly -Times 1 -Scope It
+                Assert-MockCalled -CommandName Copy-ItemWithRobocopy -Exactly -Times 1 -Scope It
+                Assert-MockCalled -CommandName Disconnect-UncPath -Exactly -Times 1 -Scope It
             }
 
             It 'Should return the correct destination path' {
@@ -892,7 +561,7 @@ InModuleScope $script:subModuleName {
                 }
 
                 $invokeInstallationMediaCopyResult = Invoke-InstallationMediaCopy @invokeInstallationMediaCopyParameters
-                $invokeInstallationMediaCopyResult | Should -Be ('{0}{1}' -f $mockDestinationPath, $mockSourcePathGuid)
+                $invokeInstallationMediaCopyResult | Should -Be ('{0}\{1}' -f $mockDestinationPath, $mockSourcePathGuid)
             }
         }
     }
@@ -906,6 +575,13 @@ InModuleScope $script:subModuleName {
             $mockShareCredential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList @(
                 $mockShareCredentialUserName,
                 ($mockShareCredentialPassword | ConvertTo-SecureString -AsPlainText -Force)
+            )
+
+            $mockFqdnShareCredentialUserName = 'SqlAdmin@company.local'
+            $mockFqdnShareCredentialPassword = 'dummyPassW0rd'
+            $mockFqdnShareCredential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList @(
+                $mockFqdnShareCredentialUserName,
+                ($mockFqdnShareCredentialPassword | ConvertTo-SecureString -AsPlainText -Force)
             )
 
             Mock -CommandName New-SmbMapping -MockWith {
@@ -928,25 +604,45 @@ InModuleScope $script:subModuleName {
                 Assert-MockCalled -CommandName New-SmbMapping -ParameterFilter {
                     $RemotePath -eq $mockSourcePathUNC `
                     -and $PSBoundParameters.ContainsKey('UserName') -eq $false
-                } -Exactly -Times 1 -Scope 'It'
+                } -Exactly -Times 1 -Scope It
             }
         }
 
         Context 'When connecting to a UNC path with specific credentials' {
-            It 'Should call the correct mocks' {
-                {
-                    $connectUncPathParameters = @{
-                        RemotePath = $mockSourcePathUNC
-                        SourceCredential = $mockShareCredential
-                    }
+            Context 'When connecting using NetBIOS domain' {
+                It 'Should call the correct mocks' {
+                    {
+                        $connectUncPathParameters = @{
+                            RemotePath = $mockSourcePathUNC
+                            SourceCredential = $mockShareCredential
+                        }
 
-                    Connect-UncPath @connectUncPathParameters
-                } | Should -Not -Throw
+                        Connect-UncPath @connectUncPathParameters
+                    } | Should -Not -Throw
 
-                Assert-MockCalled -CommandName New-SmbMapping -ParameterFilter {
-                    $RemotePath -eq $mockSourcePathUNC `
-                    -and $UserName -eq $mockShareCredentialUserName
-                } -Exactly -Times 1 -Scope 'It'
+                    Assert-MockCalled -CommandName New-SmbMapping -ParameterFilter {
+                        $RemotePath -eq $mockSourcePathUNC `
+                        -and $UserName -eq $mockShareCredentialUserName
+                    } -Exactly -Times 1 -Scope It
+                }
+            }
+
+            Context 'When connecting using Fully Qualified Domain Name (FQDN)' {
+                It 'Should call the correct mocks' {
+                    {
+                        $connectUncPathParameters = @{
+                            RemotePath = $mockSourcePathUNC
+                            SourceCredential = $mockFqdnShareCredential
+                        }
+
+                        Connect-UncPath @connectUncPathParameters
+                    } | Should -Not -Throw
+
+                    Assert-MockCalled -CommandName New-SmbMapping -ParameterFilter {
+                        $RemotePath -eq $mockSourcePathUNC `
+                        -and $UserName -eq $mockFqdnShareCredentialUserName
+                    } -Exactly -Times 1 -Scope It
+                }
             }
         }
 
@@ -981,7 +677,7 @@ InModuleScope $script:subModuleName {
                     Disconnect-UncPath @disconnectUncPathParameters
                 } | Should -Not -Throw
 
-                Assert-MockCalled -CommandName Remove-SmbMapping -Exactly -Times 1 -Scope 'It'
+                Assert-MockCalled -CommandName Remove-SmbMapping -Exactly -Times 1 -Scope It
             }
         }
     }
@@ -998,7 +694,7 @@ InModuleScope $script:subModuleName {
                 $testPendingRestartResult = Test-PendingRestart
                 $testPendingRestartResult | Should -BeTrue
 
-                Assert-MockCalled -CommandName Get-RegistryPropertyValue -Exactly -Times 1 -Scope 'It'
+                Assert-MockCalled -CommandName Get-RegistryPropertyValue -Exactly -Times 1 -Scope It
             }
         }
 
@@ -1011,7 +707,7 @@ InModuleScope $script:subModuleName {
                 $testPendingRestartResult = Test-PendingRestart
                 $testPendingRestartResult | Should -BeFalse
 
-                Assert-MockCalled -CommandName Get-RegistryPropertyValue -Exactly -Times 1 -Scope 'It'
+                Assert-MockCalled -CommandName Get-RegistryPropertyValue -Exactly -Times 1 -Scope It
             }
         }
     }
@@ -1021,7 +717,7 @@ InModuleScope $script:subModuleName {
             It 'Should return exit code 0' {
                 $startSqlSetupProcessParameters = @{
                     FilePath = 'powershell.exe'
-                    ArgumentList = '-Command &{Start-Sleep -Seconds 2}'
+                    ArgumentList = '-NonInteractive -NoProfile -Command &{Start-Sleep -Seconds 2}'
                     Timeout = 30
                 }
 
@@ -1034,7 +730,7 @@ InModuleScope $script:subModuleName {
             It 'Should throw an error message' {
                 $startSqlSetupProcessParameters = @{
                     FilePath = 'powershell.exe'
-                    ArgumentList = '-Command &{Start-Sleep -Seconds 4}'
+                    ArgumentList = '-NonInteractive -NoProfile -Command &{Start-Sleep -Seconds 4}'
                     Timeout = 2
                 }
 
@@ -1045,203 +741,255 @@ InModuleScope $script:subModuleName {
 
     Describe 'SqlServerDsc.Common\Restart-SqlService' -Tag 'RestartSqlService' {
         Context 'Restart-SqlService standalone instance' {
-            BeforeEach {
-                Mock -CommandName Connect-SQL -MockWith {
-                    return @{
-                        Name = 'MSSQLSERVER'
-                        InstanceName = ''
-                        ServiceName = 'MSSQLSERVER'
-                        Status = $mockDynamicStatus
-                        IsClustered = $false
+            Context 'When the Windows services should be restarted' {
+                BeforeAll {
+                    Mock -CommandName Connect-SQL -MockWith {
+                        return @{
+                            Name = 'MSSQLSERVER'
+                            ServiceName = 'MSSQLSERVER'
+                            Status = 'Online'
+                            IsClustered = $false
+                        }
                     }
-                } -Verifiable -ParameterFilter { $InstanceName -eq 'MSSQLSERVER' }
 
-                Mock -CommandName Connect-SQL -MockWith {
-                    return @{
-                        Name = 'NOCLUSTERCHECK'
-                        InstanceName = 'NOCLUSTERCHECK'
-                        ServiceName = 'NOCLUSTERCHECK'
-                        Status = $mockDynamicStatus
-                        IsClustered = $true
+                    Mock -CommandName Get-Service -MockWith {
+                        return @{
+                            Name = 'MSSQLSERVER'
+                            DisplayName = 'Microsoft SQL Server (MSSQLSERVER)'
+                            DependentServices = @(
+                                @{
+                                    Name = 'SQLSERVERAGENT'
+                                    DisplayName = 'SQL Server Agent (MSSQLSERVER)'
+                                    Status = 'Running'
+                                    DependentServices = @()
+                                }
+                            )
+                        }
                     }
-                } -Verifiable -ParameterFilter { $InstanceName -eq 'NOCLUSTERCHECK' }
 
-                Mock -CommandName Connect-SQL -MockWith {
-                    return @{
-                        Name = 'NOCONNECT'
-                        InstanceName = 'NOCONNECT'
-                        ServiceName = 'NOCONNECT'
-                        Status = $mockDynamicStatus
-                        IsClustered = $true
-                    }
-                } -Verifiable -ParameterFilter { $InstanceName -eq 'NOCONNECT' }
+                    Mock -CommandName Restart-Service
+                    Mock -CommandName Start-Service
+                    Mock -CommandName Restart-SqlClusterService
+                }
 
-                Mock -CommandName Connect-SQL -MockWith {
-                    return @{
-                        Name = 'NOAGENT'
-                        InstanceName = 'NOAGENT'
-                        ServiceName = 'NOAGENT'
-                        Status = $mockDynamicStatus
-                    }
-                } -Verifiable -ParameterFilter { $InstanceName -eq 'NOAGENT' }
+                It 'Should restart SQL Service and running SQL Agent service' {
+                    { Restart-SqlService -ServerName $env:COMPUTERNAME -InstanceName 'MSSQLSERVER' } | Should -Not -Throw
 
-                Mock -CommandName Connect-SQL -MockWith {
-                    return @{
-                        Name = 'STOPPEDAGENT'
-                        InstanceName = 'STOPPEDAGENT'
-                        ServiceName = 'STOPPEDAGENT'
-                        Status = $mockDynamicStatus
+                    Assert-MockCalled -CommandName Connect-SQL -ParameterFilter {
+                        # Make sure we assert just the first call to Connect-SQL
+                        $PSBoundParameters.ContainsKey('ErrorAction') -eq $false
+                    } -Scope It -Exactly -Times 1
+
+                    Assert-MockCalled -CommandName Restart-SqlClusterService -Scope It -Exactly -Times 0
+                    Assert-MockCalled -CommandName Get-Service -Scope It -Exactly -Times 1
+                    Assert-MockCalled -CommandName Restart-Service -Scope It -Exactly -Times 1
+                    Assert-MockCalled -CommandName Start-Service -Scope It -Exactly -Times 1
+
+                }
+
+                Context 'When skipping the cluster check' {
+                    It 'Should restart SQL Service and running SQL Agent service' {
+                        { Restart-SqlService -ServerName $env:COMPUTERNAME -InstanceName 'MSSQLSERVER' -SkipClusterCheck } | Should -Not -Throw
+
+                        Assert-MockCalled -CommandName Connect-SQL -ParameterFilter {
+                            # Make sure we assert just the first call to Connect-SQL
+                            $PSBoundParameters.ContainsKey('ErrorAction') -eq $false
+                        } -Scope It -Exactly -Times 0
+
+                        Assert-MockCalled -CommandName Restart-SqlClusterService -Scope It -Exactly -Times 0
+                        Assert-MockCalled -CommandName Get-Service -Scope It -Exactly -Times 1
+                        Assert-MockCalled -CommandName Restart-Service -Scope It -Exactly -Times 1
+                        Assert-MockCalled -CommandName Start-Service -Scope It -Exactly -Times 1
                     }
-                } -Verifiable -ParameterFilter { $InstanceName -eq 'STOPPEDAGENT' }
+                }
+
+                Context 'When skipping the online check' {
+                    It 'Should restart SQL Service and running SQL Agent service and not wait for the SQL Server instance to come back online' {
+                        { Restart-SqlService -ServerName $env:COMPUTERNAME -InstanceName 'MSSQLSERVER' -SkipWaitForOnline } | Should -Not -Throw
+
+                        Assert-MockCalled -CommandName Connect-SQL -ParameterFilter {
+                            # Make sure we assert just the first call to Connect-SQL
+                            $PSBoundParameters.ContainsKey('ErrorAction') -eq $false
+                        } -Scope It -Exactly -Times 1
+
+                        Assert-MockCalled -CommandName Connect-SQL -ParameterFilter {
+                            # Make sure we assert just the first call to Connect-SQL
+                            $PSBoundParameters.ContainsKey('ErrorAction') -eq $true
+                        } -Scope It -Exactly -Times 0
+
+                        Assert-MockCalled -CommandName Restart-SqlClusterService -Scope It -Exactly -Times 0
+                        Assert-MockCalled -CommandName Get-Service -Scope It -Exactly -Times 1
+                        Assert-MockCalled -CommandName Restart-Service -Scope It -Exactly -Times 1
+                        Assert-MockCalled -CommandName Start-Service -Scope It -Exactly -Times 1
+                    }
+                }
             }
 
-            BeforeAll {
-                ## SQL instance with running SQL Agent Service
-                Mock -CommandName Get-Service -MockWith {
-                    return @{
-                        Name = 'MSSQLSERVER'
-                        DisplayName = 'Microsoft SQL Server (MSSQLSERVER)'
-                        DependentServices = @(
-                            @{
-                                Name = 'SQLSERVERAGENT'
-                                DisplayName = 'SQL Server Agent (MSSQLSERVER)'
-                                Status = 'Running'
-                                DependentServices = @()
-                            }
-                        )
+            Context 'When the SQL Server instance is a Failover Cluster instance' {
+                BeforeAll {
+                    Mock -CommandName Connect-SQL -MockWith {
+                        return @{
+                            Name = 'MSSQLSERVER'
+                            ServiceName = 'MSSQLSERVER'
+                            Status = 'Online'
+                            IsClustered = $true
+                        }
                     }
-                } -Verifiable -ParameterFilter { $Name -eq 'MSSQLSERVER' }
 
-                ## SQL instance with no installed SQL Agent Service
-                Mock -CommandName Get-Service -MockWith {
-                    return @{
-                        Name = 'MSSQL$NOAGENT'
-                        DisplayName = 'Microsoft SQL Server (NOAGENT)'
-                        DependentServices = @()
+                    Mock -CommandName Get-Service
+                    Mock -CommandName Restart-Service
+                    Mock -CommandName Start-Service
+                    Mock -CommandName Restart-SqlClusterService
+                }
+
+                It 'Should just call Restart-SqlClusterService to restart the SQL Server cluster instance' {
+                    { Restart-SqlService -ServerName $env:COMPUTERNAME -InstanceName 'MSSQLSERVER' } | Should -Not -Throw
+
+                    Assert-MockCalled -CommandName Connect-SQL -ParameterFilter {
+                        # Make sure we assert just the first call to Connect-SQL
+                        $PSBoundParameters.ContainsKey('ErrorAction') -eq $false
+                    } -Scope It -Exactly -Times 1
+
+                    Assert-MockCalled -CommandName Restart-SqlClusterService -Scope It -Exactly -Times 1
+                    Assert-MockCalled -CommandName Get-Service -Scope It -Exactly -Times 0
+                    Assert-MockCalled -CommandName Restart-Service -Scope It -Exactly -Times 0
+                    Assert-MockCalled -CommandName Start-Service -Scope It -Exactly -Times 0
+                }
+
+                Context 'When passing the Timeout value' {
+                    It 'Should just call Restart-SqlClusterService with the correct parameter' {
+                        { Restart-SqlService -ServerName $env:COMPUTERNAME -InstanceName 'MSSQLSERVER' -Timeout 120 } | Should -Not -Throw
+
+                        Assert-MockCalled -CommandName Restart-SqlClusterService -ParameterFilter {
+                            $PSBoundParameters.ContainsKey('Timeout') -eq $true
+                        } -Scope It -Exactly -Times 1
                     }
-                } -Verifiable -ParameterFilter { $Name -eq 'MSSQL$NOAGENT' }
+                }
 
-                ## SQL instance with no installed SQL Agent Service
-                Mock -CommandName Get-Service -MockWith {
-                    return @{
-                        Name = 'MSSQL$NOCLUSTERCHECK'
-                        DisplayName = 'Microsoft SQL Server (NOCLUSTERCHECK)'
-                        DependentServices = @()
+                Context 'When passing the OwnerNode value' {
+                    It 'Should just call Restart-SqlClusterService with the correct parameter' {
+                        { Restart-SqlService -ServerName $env:COMPUTERNAME -InstanceName 'MSSQLSERVER' -OwnerNode @('TestNode') } | Should -Not -Throw
+
+                        Assert-MockCalled -CommandName Restart-SqlClusterService -ParameterFilter {
+                            $PSBoundParameters.ContainsKey('OwnerNode') -eq $true
+                        } -Scope It -Exactly -Times 1
                     }
-                } -Verifiable -ParameterFilter { $Name -eq 'MSSQL$NOCLUSTERCHECK' }
-
-                ## SQL instance with no installed SQL Agent Service
-                Mock -CommandName Get-Service -MockWith {
-                    return @{
-                        Name = 'MSSQL$NOCONNECT'
-                        DisplayName = 'Microsoft SQL Server (NOCONNECT)'
-                        DependentServices = @()
-                    }
-                } -Verifiable -ParameterFilter { $Name -eq 'MSSQL$NOCONNECT' }
-
-                ## SQL instance with stopped SQL Agent Service
-                Mock -CommandName Get-Service -MockWith {
-                    return @{
-                        Name = 'MSSQL$STOPPEDAGENT'
-                        DisplayName = 'Microsoft SQL Server (STOPPEDAGENT)'
-                        DependentServices = @(
-                            @{
-                                Name = 'SQLAGENT$STOPPEDAGENT'
-                                DisplayName = 'SQL Server Agent (STOPPEDAGENT)'
-                                Status = 'Stopped'
-                                DependentServices = @()
-                            }
-                        )
-                    }
-                } -Verifiable -ParameterFilter { $Name -eq 'MSSQL$STOPPEDAGENT' }
-
-                Mock -CommandName Restart-Service -Verifiable
-                Mock -CommandName Start-Service -Verifiable
+                }
             }
 
-            $mockDynamicStatus = 'Online'
+            Context 'When the Windows services should be restarted but there is not SQL Agent service' {
+                BeforeAll {
+                    Mock -CommandName Connect-SQL -MockWith {
+                        return @{
+                            Name = 'NOAGENT'
+                            InstanceName = 'NOAGENT'
+                            ServiceName = 'NOAGENT'
+                            Status = 'Online'
+                        }
+                    }
 
-            It 'Should restart SQL Service and running SQL Agent service' {
-                { Restart-SqlService -ServerName $env:ComputerName -InstanceName 'MSSQLSERVER' } | Should -Not -Throw
+                    Mock -CommandName Get-Service -MockWith {
+                        return @{
+                            Name = 'MSSQL$NOAGENT'
+                            DisplayName = 'Microsoft SQL Server (NOAGENT)'
+                            DependentServices = @()
+                        }
+                    }
 
-                Assert-MockCalled -CommandName Connect-SQL -ParameterFilter {
-                    $PSBoundParameters.ContainsKey('ErrorAction') -eq $false
-                } -Scope It -Exactly -Times 1
-                Assert-MockCalled -CommandName Get-Service -Scope It -Exactly -Times 1
-                Assert-MockCalled -CommandName Restart-Service -Scope It -Exactly -Times 1
-                Assert-MockCalled -CommandName Start-Service -Scope It -Exactly -Times 1
+                    Mock -CommandName Restart-Service
+                    Mock -CommandName Start-Service
+                    Mock -CommandName Restart-SqlClusterService
+                }
+
+                It 'Should restart SQL Service and not try to restart missing SQL Agent service' {
+                    { Restart-SqlService -ServerName $env:COMPUTERNAME -InstanceName 'NOAGENT' -SkipClusterCheck } | Should -Not -Throw
+
+                    Assert-MockCalled -CommandName Get-Service -Scope It -Exactly -Times 1
+                    Assert-MockCalled -CommandName Restart-Service -Scope It -Exactly -Times 1
+                    Assert-MockCalled -CommandName Start-Service -Scope It -Exactly -Times 0
+                }
             }
 
-            It 'Should restart SQL Service, and not do cluster cluster check' {
-                Mock -CommandName Get-CimInstance
+            Context 'When the Windows services should be restarted but the SQL Agent service is stopped' {
+                BeforeAll {
+                    Mock -CommandName Connect-SQL -MockWith {
+                        return @{
+                            Name = 'STOPPEDAGENT'
+                            InstanceName = 'STOPPEDAGENT'
+                            ServiceName = 'STOPPEDAGENT'
+                            Status = 'Online'
+                        }
+                    }
 
-                { Restart-SqlService -ServerName $env:ComputerName -InstanceName 'NOCLUSTERCHECK' -SkipClusterCheck } | Should -Not -Throw
+                    Mock -CommandName Get-Service -MockWith {
+                        return @{
+                            Name = 'MSSQL$STOPPEDAGENT'
+                            DisplayName = 'Microsoft SQL Server (STOPPEDAGENT)'
+                            DependentServices = @(
+                                @{
+                                    Name = 'SQLAGENT$STOPPEDAGENT'
+                                    DisplayName = 'SQL Server Agent (STOPPEDAGENT)'
+                                    Status = 'Stopped'
+                                    DependentServices = @()
+                                }
+                            )
+                        }
+                    }
 
-                Assert-MockCalled -CommandName Connect-SQL -Scope It -Exactly -Times 1
-                Assert-MockCalled -CommandName Get-Service -Scope It -Exactly -Times 1
-                Assert-MockCalled -CommandName Restart-Service -Scope It -Exactly -Times 1
-                Assert-MockCalled -CommandName Start-Service -Scope It -Exactly -Times 0
-                Assert-MockCalled -CommandName Get-CimInstance -Scope It -Exactly -Times 0
-            }
+                    Mock -CommandName Restart-Service
+                    Mock -CommandName Start-Service
+                    Mock -CommandName Restart-SqlClusterService
+                }
 
-            It 'Should restart SQL Service, and not do cluster cluster check nor check online status' {
-                Mock -CommandName Get-CimInstance
+                It 'Should restart SQL Service and not try to restart stopped SQL Agent service' {
+                    { Restart-SqlService -ServerName $env:COMPUTERNAME -InstanceName 'STOPPEDAGENT' -SkipClusterCheck } | Should -Not -Throw
 
-                { Restart-SqlService -ServerName $env:ComputerName -InstanceName 'NOCONNECT' -SkipClusterCheck -SkipWaitForOnline } | Should -Not -Throw
-
-                Assert-MockCalled -CommandName Get-Service -Scope It -Exactly -Times 1
-                Assert-MockCalled -CommandName Restart-Service -Scope It -Exactly -Times 1
-                Assert-MockCalled -CommandName Connect-SQL -Scope It -Exactly -Times 0
-                Assert-MockCalled -CommandName Start-Service -Scope It -Exactly -Times 0
-                Assert-MockCalled -CommandName Get-CimInstance -Scope It -Exactly -Times 0
-            }
-
-            It 'Should restart SQL Service and not try to restart missing SQL Agent service' {
-                { Restart-SqlService -ServerName $env:ComputerName -InstanceName 'NOAGENT' } | Should -Not -Throw
-
-                Assert-MockCalled -CommandName Connect-SQL {
-                    $PSBoundParameters.ContainsKey('ErrorAction') -eq $false
-                } -Scope It -Exactly -Times 1
-                Assert-MockCalled -CommandName Get-Service -Scope It -Exactly -Times 1
-                Assert-MockCalled -CommandName Restart-Service -Scope It -Exactly -Times 1
-                Assert-MockCalled -CommandName Start-Service -Scope It -Exactly -Times 0
-            }
-
-            It 'Should restart SQL Service and not try to restart stopped SQL Agent service' {
-                { Restart-SqlService -ServerName $env:ComputerName -InstanceName 'STOPPEDAGENT' } | Should -Not -Throw
-
-                Assert-MockCalled -CommandName Connect-SQL {
-                    $PSBoundParameters.ContainsKey('ErrorAction') -eq $false
-                } -Scope It -Exactly -Times 1
-                Assert-MockCalled -CommandName Get-Service -Scope It -Exactly -Times 1
-                Assert-MockCalled -CommandName Restart-Service -Scope It -Exactly -Times 1
-                Assert-MockCalled -CommandName Start-Service -Scope It -Exactly -Times 0
+                    Assert-MockCalled -CommandName Get-Service -Scope It -Exactly -Times 1
+                    Assert-MockCalled -CommandName Restart-Service -Scope It -Exactly -Times 1
+                    Assert-MockCalled -CommandName Start-Service -Scope It -Exactly -Times 0
+                }
             }
 
             Context 'When it fails to connect to the instance within the timeout period' {
-                BeforeEach {
+                BeforeAll {
                     Mock -CommandName Connect-SQL -MockWith {
                         return @{
                             Name = 'MSSQLSERVER'
                             InstanceName = ''
                             ServiceName = 'MSSQLSERVER'
-                            Status = $mockDynamicStatus
+                            Status = 'Offline'
                         }
-                    } -Verifiable -ParameterFilter { $InstanceName -eq 'MSSQLSERVER' }
+                    }
+
+                    Mock -CommandName Get-Service -MockWith {
+                        return @{
+                            Name = 'MSSQLSERVER'
+                            DisplayName = 'Microsoft SQL Server (MSSQLSERVER)'
+                            DependentServices = @(
+                                @{
+                                    Name = 'SQLSERVERAGENT'
+                                    DisplayName = 'SQL Server Agent (MSSQLSERVER)'
+                                    Status = 'Running'
+                                    DependentServices = @()
+                                }
+                            )
+                        }
+                    }
+
+                    Mock -CommandName Restart-Service
+                    Mock -CommandName Start-Service
                 }
 
-                $mockDynamicStatus = 'Offline'
-
                 It 'Should wait for timeout before throwing error message' {
-                    $errorMessage = $localizedData.FailedToConnectToInstanceTimeout -f $env:ComputerName, 'MSSQLSERVER', 4
+                    $mockErrorMessage = Get-InvalidOperationRecord -Message (
+                        $localizedData.FailedToConnectToInstanceTimeout -f $env:ComputerName, 'MSSQLSERVER', 4
+                    )
+
+                    $mockErrorMessage.Exception.Message | Should -Not -BeNullOrEmpty
 
                     {
-                        Restart-SqlService -ServerName $env:ComputerName -InstanceName 'MSSQLSERVER' -Timeout 4
-                    } | Should -Throw $errorMessage
-
-                    Assert-MockCalled -CommandName Connect-SQL -ParameterFilter {
-                        $PSBoundParameters.ContainsKey('ErrorAction') -eq $false
-                    } -Scope It -Exactly -Times 1
+                        Restart-SqlService -ServerName $env:ComputerName -InstanceName 'MSSQLSERVER' -Timeout 4 -SkipClusterCheck
+                    } | Should -Throw -ExpectedMessage $mockErrorMessage
 
                     Assert-MockCalled -CommandName Connect-SQL -ParameterFilter {
                         $PSBoundParameters.ContainsKey('ErrorAction') -eq $true
@@ -1249,110 +997,399 @@ InModuleScope $script:subModuleName {
                 }
             }
         }
+    }
 
-        Context 'Restart-SqlService clustered instance' {
-            BeforeEach {
-                Mock -CommandName Connect-SQL -MockWith {
-                    return @{
-                        Name = 'MSSQLSERVER'
-                        InstanceName = ''
-                        ServiceName = 'MSSQLSERVER'
-                        IsClustered = $true
-                        Status = $mockDynamicStatus
-                    }
-                } -Verifiable -ParameterFilter { ($ServerName -eq 'CLU01') -and ($InstanceName -eq 'MSSQLSERVER') }
-
-                Mock -CommandName Connect-SQL -MockWith {
-                    return @{
-                        Name = 'NAMEDINSTANCE'
-                        InstanceName = 'NAMEDINSTANCE'
-                        ServiceName = 'NAMEDINSTANCE'
-                        IsClustered = $true
-                        Status = $mockDynamicStatus
-                    }
-                } -Verifiable -ParameterFilter { ($ServerName -eq 'CLU01') -and ($InstanceName -eq 'NAMEDINSTANCE') }
-
-                Mock -CommandName Connect-SQL -MockWith {
-                    return @{
-                        Name = 'STOPPEDAGENT'
-                        InstanceName = 'STOPPEDAGENT'
-                        ServiceName = 'STOPPEDAGENT'
-                        IsClustered = $true
-                        Status = $mockDynamicStatus
-                    }
-                } -Verifiable -ParameterFilter { ($ServerName -eq 'CLU01') -and ($InstanceName -eq 'STOPPEDAGENT') }
+    Describe 'SqlServerDsc.Common\Restart-SqlClusterService' -Tag 'RestartSqlClusterService' {
+        Context 'When not clustered instance is found' {
+            BeforeAll {
+                Mock -CommandName Get-CimInstance
+                Mock -CommandName Get-CimAssociatedInstance
+                Mock -CommandName Invoke-CimMethod
             }
 
+            It 'Should not restart any cluster resources' {
+                { Restart-SqlClusterService -InstanceName 'MSSQLSERVER' } | Should -Not -Throw
+
+                Assert-MockCalled -CommandName Get-CimInstance -Scope It -Exactly -Times 1
+            }
+        }
+
+        Context 'When clustered instance is offline' {
             BeforeAll {
                 Mock -CommandName Get-CimInstance -MockWith {
-                    @('MSSQLSERVER','NAMEDINSTANCE','STOPPEDAGENT') | ForEach-Object {
+                    $mock = New-Object -TypeName Microsoft.Management.Infrastructure.CimInstance -ArgumentList 'MSCluster_Resource','root/MSCluster'
+
+                    $mock | Add-Member -MemberType NoteProperty -Name 'Name' -Value 'SQL Server (MSSQLSERVER)' -TypeName 'String'
+                    $mock | Add-Member -MemberType NoteProperty -Name 'Type' -Value 'SQL Server' -TypeName 'String'
+                    $mock | Add-Member -MemberType NoteProperty -Name 'PrivateProperties' -Value @{
+                        InstanceName = 'MSSQLSERVER'
+                    }
+                    # Mock the resource to be online.
+                    $mock | Add-Member -MemberType NoteProperty -Name 'State' -Value 3 -TypeName 'Int32'
+
+                    return $mock
+                }
+
+                Mock -CommandName Get-CimAssociatedInstance
+                Mock -CommandName Invoke-CimMethod
+            }
+
+            It 'Should not restart any cluster resources' {
+                { Restart-SqlClusterService -InstanceName 'MSSQLSERVER' } | Should -Not -Throw
+
+                Assert-MockCalled -CommandName Get-CimInstance -Scope It -Exactly -Times 1
+                Assert-MockCalled -CommandName Get-CimAssociatedInstance -Scope It -Exactly -Times 0
+
+                Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter {
+                    $MethodName -eq 'TakeOffline'
+                } -Scope It -Exactly -Times 0
+
+                Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter {
+                    $MethodName -eq 'BringOnline'
+                } -Scope It -Exactly -Times 0
+            }
+        }
+
+        Context 'When restarting a Sql Server clustered instance' {
+            Context 'When it is the default instance'{
+                BeforeAll {
+                    Mock -CommandName Get-CimInstance -MockWith {
                         $mock = New-Object -TypeName Microsoft.Management.Infrastructure.CimInstance -ArgumentList 'MSCluster_Resource','root/MSCluster'
 
-                        $mock | Add-Member -MemberType NoteProperty -Name 'Name' -Value "SQL Server ($($_))" -TypeName 'String'
+                        $mock | Add-Member -MemberType NoteProperty -Name 'Name' -Value 'SQL Server (MSSQLSERVER)' -TypeName 'String'
                         $mock | Add-Member -MemberType NoteProperty -Name 'Type' -Value 'SQL Server' -TypeName 'String'
                         $mock | Add-Member -MemberType NoteProperty -Name 'PrivateProperties' -Value @{
-                            InstanceName = $_
+                            InstanceName = 'MSSQLSERVER'
                         }
+                        # Mock the resource to be online.
+                        $mock | Add-Member -MemberType NoteProperty -Name 'State' -Value 2 -TypeName 'Int32'
 
                         return $mock
                     }
-                } -Verifiable -ParameterFilter { ($ClassName -eq 'MSCluster_Resource') -and ($Filter -eq "Type = 'SQL Server'") }
+
+                    Mock -CommandName Get-CimAssociatedInstance -MockWith {
+                        $mock = New-Object -TypeName Microsoft.Management.Infrastructure.CimInstance -ArgumentList 'MSCluster_Resource','root/MSCluster'
+
+                        $mock | Add-Member -MemberType NoteProperty -Name 'Name' -Value "SQL Server Agent ($($InputObject.PrivateProperties.InstanceName))" -TypeName 'String'
+                        $mock | Add-Member -MemberType NoteProperty -Name 'Type' -Value 'SQL Server Agent' -TypeName 'String'
+                        # Mock the resource to be online.
+                        $mock | Add-Member -MemberType NoteProperty -Name 'State' -Value 2 -TypeName 'Int32'
+
+                        return $mock
+                    }
+
+                    Mock -CommandName Invoke-CimMethod
+                }
+
+                It 'Should restart SQL Server cluster resource and the SQL Agent cluster resource' {
+                    { Restart-SqlClusterService -InstanceName 'MSSQLSERVER' } | Should -Not -Throw
+
+                    Assert-MockCalled -CommandName Get-CimInstance -Scope It -Exactly -Times 1
+                    Assert-MockCalled -CommandName Get-CimAssociatedInstance -Scope It -Exactly -Times 1
+
+                    Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter {
+                        $MethodName -eq 'TakeOffline' -and $InputObject.Name -eq 'SQL Server (MSSQLSERVER)'
+                    } -Scope It -Exactly -Times 1
+
+                    Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter {
+                        $MethodName -eq 'BringOnline' -and $InputObject.Name -eq 'SQL Server (MSSQLSERVER)'
+                    } -Scope It -Exactly -Times 1
+
+                    Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter {
+                        $MethodName -eq 'BringOnline' -and $InputObject.Name -eq 'SQL Server Agent (MSSQLSERVER)'
+                    } -Scope It -Exactly -Times 1
+                }
+            }
+
+            Context 'When it is a named instance'{
+                BeforeAll {
+                    Mock -CommandName Get-CimInstance -MockWith {
+                        $mock = New-Object -TypeName Microsoft.Management.Infrastructure.CimInstance -ArgumentList 'MSCluster_Resource','root/MSCluster'
+
+                        $mock | Add-Member -MemberType NoteProperty -Name 'Name' -Value 'SQL Server (DSCTEST)' -TypeName 'String'
+                        $mock | Add-Member -MemberType NoteProperty -Name 'Type' -Value 'SQL Server' -TypeName 'String'
+                        $mock | Add-Member -MemberType NoteProperty -Name 'PrivateProperties' -Value @{
+                            InstanceName = 'DSCTEST'
+                        }
+                        # Mock the resource to be online.
+                        $mock | Add-Member -MemberType NoteProperty -Name 'State' -Value 2 -TypeName 'Int32'
+
+                        return $mock
+                    }
+
+                    Mock -CommandName Get-CimAssociatedInstance -MockWith {
+                        $mock = New-Object -TypeName Microsoft.Management.Infrastructure.CimInstance -ArgumentList 'MSCluster_Resource','root/MSCluster'
+
+                        $mock | Add-Member -MemberType NoteProperty -Name 'Name' -Value "SQL Server Agent ($($InputObject.PrivateProperties.InstanceName))" -TypeName 'String'
+                        $mock | Add-Member -MemberType NoteProperty -Name 'Type' -Value 'SQL Server Agent' -TypeName 'String'
+                        # Mock the resource to be online.
+                        $mock | Add-Member -MemberType NoteProperty -Name 'State' -Value 2 -TypeName 'Int32'
+
+                        return $mock
+                    }
+
+                    Mock -CommandName Invoke-CimMethod
+                }
+
+                It 'Should restart SQL Server cluster resource and the SQL Agent cluster resource' {
+                    { Restart-SqlClusterService -InstanceName 'DSCTEST' } | Should -Not -Throw
+
+                    Assert-MockCalled -CommandName Get-CimInstance -Scope It -Exactly -Times 1
+                    Assert-MockCalled -CommandName Get-CimAssociatedInstance -Scope It -Exactly -Times 1
+
+                    Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter {
+                        $MethodName -eq 'TakeOffline' -and $InputObject.Name -eq 'SQL Server (DSCTEST)'
+                    } -Scope It -Exactly -Times 1
+
+                    Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter {
+                        $MethodName -eq 'BringOnline' -and $InputObject.Name -eq 'SQL Server (DSCTEST)'
+                    } -Scope It -Exactly -Times 1
+
+                    Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter {
+                        $MethodName -eq 'BringOnline' -and $InputObject.Name -eq 'SQL Server Agent (DSCTEST)'
+                    } -Scope It -Exactly -Times 1
+                }
+            }
+        }
+
+        Context 'When restarting a Sql Server clustered instance and the SQL Agent is offline' {
+            BeforeAll {
+                Mock -CommandName Get-CimInstance -MockWith {
+                    $mock = New-Object -TypeName Microsoft.Management.Infrastructure.CimInstance -ArgumentList 'MSCluster_Resource','root/MSCluster'
+
+                    $mock | Add-Member -MemberType NoteProperty -Name 'Name' -Value 'SQL Server (MSSQLSERVER)' -TypeName 'String'
+                    $mock | Add-Member -MemberType NoteProperty -Name 'Type' -Value 'SQL Server' -TypeName 'String'
+                    $mock | Add-Member -MemberType NoteProperty -Name 'PrivateProperties' -Value @{
+                        InstanceName = 'MSSQLSERVER'
+                    }
+                    # Mock the resource to be online.
+                    $mock | Add-Member -MemberType NoteProperty -Name 'State' -Value 2 -TypeName 'Int32'
+
+                    return $mock
+                }
 
                 Mock -CommandName Get-CimAssociatedInstance -MockWith {
                     $mock = New-Object -TypeName Microsoft.Management.Infrastructure.CimInstance -ArgumentList 'MSCluster_Resource','root/MSCluster'
 
                     $mock | Add-Member -MemberType NoteProperty -Name 'Name' -Value "SQL Server Agent ($($InputObject.PrivateProperties.InstanceName))" -TypeName 'String'
                     $mock | Add-Member -MemberType NoteProperty -Name 'Type' -Value 'SQL Server Agent' -TypeName 'String'
-                    $mock | Add-Member -MemberType NoteProperty -Name 'State' -Value (
-                        @{
-                            $true = 3
-                            $false = 2
-                        }[($InputObject.PrivateProperties.InstanceName -eq 'STOPPEDAGENT')]
-                    ) -TypeName 'Int32'
+                    # Mock the resource to be offline.
+                    $mock | Add-Member -MemberType NoteProperty -Name 'State' -Value 3 -TypeName 'Int32'
 
                     return $mock
-                } -Verifiable -ParameterFilter { $ResultClassName -eq 'MSCluster_Resource' }
+                }
 
-                Mock -CommandName Invoke-CimMethod -ParameterFilter { $MethodName -eq 'TakeOffline' } -Verifiable
-                Mock -CommandName Invoke-CimMethod -ParameterFilter { $MethodName -eq 'BringOnline' } -Verifiable
+                Mock -CommandName Invoke-CimMethod
             }
 
-            $mockDynamicStatus = 'Online'
+            It 'Should restart the SQL Server cluster resource and ignore the SQL Agent cluster resource online ' {
+                { Restart-SqlClusterService -InstanceName 'MSSQLSERVER' } | Should -Not -Throw
 
-            It 'Should restart SQL Server and SQL Agent resources for a clustered default instance' {
-                { Restart-SqlService -ServerName 'CLU01' } | Should -Not -Throw
-
-                Assert-MockCalled -CommandName Connect-SQL {
-                    $PSBoundParameters.ContainsKey('ErrorAction') -eq $false
-                } -Scope It -Exactly -Times 1
                 Assert-MockCalled -CommandName Get-CimInstance -Scope It -Exactly -Times 1
                 Assert-MockCalled -CommandName Get-CimAssociatedInstance -Scope It -Exactly -Times 1
-                Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter { $MethodName -eq 'TakeOffline' } -Scope It -Exactly -Times 1
-                Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter { $MethodName -eq 'BringOnline' } -Scope It -Exactly -Times 2
+
+                Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter {
+                    $MethodName -eq 'TakeOffline' -and $InputObject.Name -eq 'SQL Server (MSSQLSERVER)'
+                } -Scope It -Exactly -Times 1
+
+                Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter {
+                    $MethodName -eq 'BringOnline' -and $InputObject.Name -eq 'SQL Server (MSSQLSERVER)'
+                } -Scope It -Exactly -Times 1
+            }
+        }
+
+        Context 'When passing the parameter OwnerNode' {
+            Context 'When both the SQL Server and SQL Agent cluster resources is owned by the current node' {
+                BeforeAll {
+                    Mock -CommandName Get-CimInstance -MockWith {
+                        $mock = New-Object -TypeName Microsoft.Management.Infrastructure.CimInstance -ArgumentList 'MSCluster_Resource','root/MSCluster'
+
+                        $mock | Add-Member -MemberType NoteProperty -Name 'Name' -Value 'SQL Server (MSSQLSERVER)' -TypeName 'String'
+                        $mock | Add-Member -MemberType NoteProperty -Name 'Type' -Value 'SQL Server' -TypeName 'String'
+                        $mock | Add-Member -MemberType NoteProperty -Name 'PrivateProperties' -Value @{
+                            InstanceName = 'MSSQLSERVER'
+                        }
+                        # Mock the resource to be online.
+                        $mock | Add-Member -MemberType NoteProperty -Name 'State' -Value 2 -TypeName 'Int32'
+                        $mock | Add-Member -MemberType NoteProperty -Name 'OwnerNode' -Value 'NODE1' -TypeName 'String'
+
+                        return $mock
+                    }
+
+                    Mock -CommandName Get-CimAssociatedInstance -MockWith {
+                        $mock = New-Object -TypeName Microsoft.Management.Infrastructure.CimInstance -ArgumentList 'MSCluster_Resource','root/MSCluster'
+
+                        $mock | Add-Member -MemberType NoteProperty -Name 'Name' -Value "SQL Server Agent ($($InputObject.PrivateProperties.InstanceName))" -TypeName 'String'
+                        $mock | Add-Member -MemberType NoteProperty -Name 'Type' -Value 'SQL Server Agent' -TypeName 'String'
+                        # Mock the resource to be offline.
+                        $mock | Add-Member -MemberType NoteProperty -Name 'State' -Value 2 -TypeName 'Int32'
+                        $mock | Add-Member -MemberType NoteProperty -Name 'OwnerNode' -Value 'NODE1' -TypeName 'String'
+
+                        return $mock
+                    }
+
+                    Mock -CommandName Invoke-CimMethod
+                }
+
+                It 'Should restart the SQL Server cluster resource and the SQL Agent cluster resource' {
+                    { Restart-SqlClusterService -InstanceName 'MSSQLSERVER' -OwnerNode @('NODE1') } | Should -Not -Throw
+
+                    Assert-MockCalled -CommandName Get-CimInstance -Scope It -Exactly -Times 1
+                    Assert-MockCalled -CommandName Get-CimAssociatedInstance -Scope It -Exactly -Times 1
+
+                    Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter {
+                        $MethodName -eq 'TakeOffline' -and $InputObject.Name -eq 'SQL Server (MSSQLSERVER)'
+                    } -Scope It -Exactly -Times 1
+
+                    Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter {
+                        $MethodName -eq 'BringOnline' -and $InputObject.Name -eq 'SQL Server (MSSQLSERVER)'
+                    } -Scope It -Exactly -Times 1
+
+                    Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter {
+                        $MethodName -eq 'BringOnline' -and $InputObject.Name -eq 'SQL Server Agent (MSSQLSERVER)'
+                    } -Scope It -Exactly -Times 1
+                }
             }
 
-            It 'Should restart SQL Server and SQL Agent resources for a clustered named instance' {
-                { Restart-SqlService -ServerName 'CLU01' -InstanceName 'NAMEDINSTANCE' } | Should -Not -Throw
+            Context 'When both the SQL Server and SQL Agent cluster resources is owned by the current node but the SQL Agent cluster resource is offline' {
+                BeforeAll {
+                    Mock -CommandName Get-CimInstance -MockWith {
+                        $mock = New-Object -TypeName Microsoft.Management.Infrastructure.CimInstance -ArgumentList 'MSCluster_Resource','root/MSCluster'
 
-                Assert-MockCalled -CommandName Connect-SQL {
-                    $PSBoundParameters.ContainsKey('ErrorAction') -eq $false
-                } -Scope It -Exactly -Times 1
-                Assert-MockCalled -CommandName Get-CimInstance -Scope It -Exactly -Times 1
-                Assert-MockCalled -CommandName Get-CimAssociatedInstance -Scope It -Exactly -Times 1
-                Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter { $MethodName -eq 'TakeOffline' } -Scope It -Exactly -Times 1
-                Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter { $MethodName -eq 'BringOnline' } -Scope It -Exactly -Times 2
+                        $mock | Add-Member -MemberType NoteProperty -Name 'Name' -Value 'SQL Server (MSSQLSERVER)' -TypeName 'String'
+                        $mock | Add-Member -MemberType NoteProperty -Name 'Type' -Value 'SQL Server' -TypeName 'String'
+                        $mock | Add-Member -MemberType NoteProperty -Name 'PrivateProperties' -Value @{
+                            InstanceName = 'MSSQLSERVER'
+                        }
+                        # Mock the resource to be online.
+                        $mock | Add-Member -MemberType NoteProperty -Name 'State' -Value 2 -TypeName 'Int32'
+                        $mock | Add-Member -MemberType NoteProperty -Name 'OwnerNode' -Value 'NODE1' -TypeName 'String'
+
+                        return $mock
+                    }
+
+                    Mock -CommandName Get-CimAssociatedInstance -MockWith {
+                        $mock = New-Object -TypeName Microsoft.Management.Infrastructure.CimInstance -ArgumentList 'MSCluster_Resource','root/MSCluster'
+
+                        $mock | Add-Member -MemberType NoteProperty -Name 'Name' -Value "SQL Server Agent ($($InputObject.PrivateProperties.InstanceName))" -TypeName 'String'
+                        $mock | Add-Member -MemberType NoteProperty -Name 'Type' -Value 'SQL Server Agent' -TypeName 'String'
+                        # Mock the resource to be offline.
+                        $mock | Add-Member -MemberType NoteProperty -Name 'State' -Value 3 -TypeName 'Int32'
+                        $mock | Add-Member -MemberType NoteProperty -Name 'OwnerNode' -Value 'NODE1' -TypeName 'String'
+
+                        return $mock
+                    }
+
+                    Mock -CommandName Invoke-CimMethod
+                }
+
+                It 'Should only restart the SQL Server cluster resource' {
+                    { Restart-SqlClusterService -InstanceName 'MSSQLSERVER' -OwnerNode @('NODE1') } | Should -Not -Throw
+
+                    Assert-MockCalled -CommandName Get-CimInstance -Scope It -Exactly -Times 1
+                    Assert-MockCalled -CommandName Get-CimAssociatedInstance -Scope It -Exactly -Times 1
+
+                    Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter {
+                        $MethodName -eq 'TakeOffline' -and $InputObject.Name -eq 'SQL Server (MSSQLSERVER)'
+                    } -Scope It -Exactly -Times 1
+
+                    Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter {
+                        $MethodName -eq 'BringOnline' -and $InputObject.Name -eq 'SQL Server (MSSQLSERVER)'
+                    } -Scope It -Exactly -Times 1
+
+                    Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter {
+                        $MethodName -eq 'BringOnline' -and $InputObject.Name -eq 'SQL Server Agent (MSSQLSERVER)'
+                    } -Scope It -Exactly -Times 0
+                }
             }
 
-            It 'Should not try to restart a SQL Agent resource that is not online' {
-                { Restart-SqlService -ServerName 'CLU01' -InstanceName 'STOPPEDAGENT' } | Should -Not -Throw
+            Context 'When only the SQL Server cluster resources is owned by the current node' {
+                BeforeAll {
+                    Mock -CommandName Get-CimInstance -MockWith {
+                        $mock = New-Object -TypeName Microsoft.Management.Infrastructure.CimInstance -ArgumentList 'MSCluster_Resource','root/MSCluster'
 
-                Assert-MockCalled -CommandName Connect-SQL {
-                    $PSBoundParameters.ContainsKey('ErrorAction') -eq $false
-                } -Scope It -Exactly -Times 1
-                Assert-MockCalled -CommandName Get-CimInstance -Scope It -Exactly -Times 1
-                Assert-MockCalled -CommandName Get-CimAssociatedInstance -Scope It -Exactly -Times 1
-                Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter { $MethodName -eq 'TakeOffline' } -Scope It -Exactly -Times 1
-                Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter { $MethodName -eq 'BringOnline' } -Scope It -Exactly -Times 1
+                        $mock | Add-Member -MemberType NoteProperty -Name 'Name' -Value 'SQL Server (MSSQLSERVER)' -TypeName 'String'
+                        $mock | Add-Member -MemberType NoteProperty -Name 'Type' -Value 'SQL Server' -TypeName 'String'
+                        $mock | Add-Member -MemberType NoteProperty -Name 'PrivateProperties' -Value @{
+                            InstanceName = 'MSSQLSERVER'
+                        }
+                        # Mock the resource to be online.
+                        $mock | Add-Member -MemberType NoteProperty -Name 'State' -Value 2 -TypeName 'Int32'
+                        $mock | Add-Member -MemberType NoteProperty -Name 'OwnerNode' -Value 'NODE1' -TypeName 'String'
+
+                        return $mock
+                    }
+
+                    Mock -CommandName Get-CimAssociatedInstance -MockWith {
+                        $mock = New-Object -TypeName Microsoft.Management.Infrastructure.CimInstance -ArgumentList 'MSCluster_Resource','root/MSCluster'
+
+                        $mock | Add-Member -MemberType NoteProperty -Name 'Name' -Value "SQL Server Agent ($($InputObject.PrivateProperties.InstanceName))" -TypeName 'String'
+                        $mock | Add-Member -MemberType NoteProperty -Name 'Type' -Value 'SQL Server Agent' -TypeName 'String'
+                        # Mock the resource to be offline.
+                        $mock | Add-Member -MemberType NoteProperty -Name 'State' -Value 2 -TypeName 'Int32'
+                        $mock | Add-Member -MemberType NoteProperty -Name 'OwnerNode' -Value 'NODE2' -TypeName 'String'
+
+                        return $mock
+                    }
+
+                    Mock -CommandName Invoke-CimMethod
+                }
+
+                It 'Should only restart the SQL Server cluster resource' {
+                    { Restart-SqlClusterService -InstanceName 'MSSQLSERVER' -OwnerNode @('NODE1') } | Should -Not -Throw
+
+                    Assert-MockCalled -CommandName Get-CimInstance -Scope It -Exactly -Times 1
+                    Assert-MockCalled -CommandName Get-CimAssociatedInstance -Scope It -Exactly -Times 1
+
+                    Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter {
+                        $MethodName -eq 'TakeOffline' -and $InputObject.Name -eq 'SQL Server (MSSQLSERVER)'
+                    } -Scope It -Exactly -Times 1
+
+                    Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter {
+                        $MethodName -eq 'BringOnline' -and $InputObject.Name -eq 'SQL Server (MSSQLSERVER)'
+                    } -Scope It -Exactly -Times 1
+
+                    Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter {
+                        $MethodName -eq 'BringOnline' -and $InputObject.Name -eq 'SQL Server Agent (MSSQLSERVER)'
+                    } -Scope It -Exactly -Times 0
+                }
+            }
+
+            Context 'When the SQL Server cluster resources is not owned by the current node' {
+                BeforeAll {
+                    Mock -CommandName Get-CimInstance -MockWith {
+                        $mock = New-Object -TypeName Microsoft.Management.Infrastructure.CimInstance -ArgumentList 'MSCluster_Resource','root/MSCluster'
+
+                        $mock | Add-Member -MemberType NoteProperty -Name 'Name' -Value 'SQL Server (MSSQLSERVER)' -TypeName 'String'
+                        $mock | Add-Member -MemberType NoteProperty -Name 'Type' -Value 'SQL Server' -TypeName 'String'
+                        $mock | Add-Member -MemberType NoteProperty -Name 'PrivateProperties' -Value @{
+                            InstanceName = 'MSSQLSERVER'
+                        }
+                        # Mock the resource to be online.
+                        $mock | Add-Member -MemberType NoteProperty -Name 'State' -Value 2 -TypeName 'Int32'
+                        $mock | Add-Member -MemberType NoteProperty -Name 'OwnerNode' -Value 'NODE2' -TypeName 'String'
+
+                        return $mock
+                    }
+
+                    Mock -CommandName Get-CimAssociatedInstance
+                    Mock -CommandName Invoke-CimMethod
+                }
+
+                It 'Should not restart any cluster resources' {
+                    { Restart-SqlClusterService -InstanceName 'MSSQLSERVER' -OwnerNode @('NODE1') } | Should -Not -Throw
+
+                    Assert-MockCalled -CommandName Get-CimInstance -Scope It -Exactly -Times 1
+                    Assert-MockCalled -CommandName Get-CimAssociatedInstance -Scope It -Exactly -Times 0
+
+                    Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter {
+                        $MethodName -eq 'TakeOffline'
+                    } -Scope It -Exactly -Times 0
+
+                    Assert-MockCalled -CommandName Invoke-CimMethod -ParameterFilter {
+                        $MethodName -eq 'BringOnline'
+                    } -Scope It -Exactly -Times 0
+                }
             }
         }
     }
@@ -1363,15 +1400,16 @@ InModuleScope $script:subModuleName {
 
             $mockNewObject_MicrosoftAnalysisServicesServer = {
                 return New-Object -TypeName Object |
-                            Add-Member -MemberType ScriptMethod -Name Connect -Value {
-                                param(
+                            Add-Member -MemberType 'ScriptMethod' -Name 'Connect' -Value {
+                                param
+                                (
                                     [Parameter(Mandatory = $true)]
                                     [ValidateNotNullOrEmpty()]
                                     [System.String]
-                                    $dataSource
+                                    $DataSource
                                 )
 
-                                if ($dataSource -ne $mockExpectedDataSource)
+                                if ($DataSource -ne $mockExpectedDataSource)
                                 {
                                     throw ("Datasource was expected to be '{0}', but was '{1}'." -f $mockExpectedDataSource,$dataSource)
                                 }
@@ -1395,14 +1433,25 @@ InModuleScope $script:subModuleName {
             $mockSqlCredentialPassword = 'StrongOne7.'
             $mockSqlCredentialSecurePassword = ConvertTo-SecureString -String $mockSqlCredentialPassword -AsPlainText -Force
             $mockSqlCredential = New-Object -TypeName PSCredential -ArgumentList ($mockSqlCredentialUserName, $mockSqlCredentialSecurePassword)
+
+            $mockNetBiosSqlCredentialUserName = 'DOMAIN\TestUserName12345'
+            $mockNetBiosSqlCredentialPassword = 'StrongOne7.'
+            $mockNetBiosSqlCredentialSecurePassword = ConvertTo-SecureString -String $mockNetBiosSqlCredentialPassword -AsPlainText -Force
+            $mockNetBiosSqlCredential = New-Object -TypeName PSCredential -ArgumentList ($mockNetBiosSqlCredentialUserName, $mockNetBiosSqlCredentialSecurePassword)
+
+            $mockFqdnSqlCredentialUserName = 'TestUserName12345@domain.local'
+            $mockFqdnSqlCredentialPassword = 'StrongOne7.'
+            $mockFqdnSqlCredentialSecurePassword = ConvertTo-SecureString -String $mockFqdnSqlCredentialPassword -AsPlainText -Force
+            $mockFqdnSqlCredential = New-Object -TypeName PSCredential -ArgumentList ($mockFqdnSqlCredentialUserName, $mockFqdnSqlCredentialSecurePassword)
+
+            Mock -CommandName Import-Assembly
         }
 
         BeforeEach {
-            Mock -CommandName New-InvalidOperationException -MockWith $mockThrowLocalizedMessage -Verifiable
+            Mock -CommandName New-InvalidOperationException -MockWith $mockThrowLocalizedMessage
             Mock -CommandName New-Object `
                 -MockWith $mockNewObject_MicrosoftAnalysisServicesServer `
-                -ParameterFilter $mockNewObject_MicrosoftAnalysisServicesServer_ParameterFilter `
-                -Verifiable
+                -ParameterFilter $mockNewObject_MicrosoftAnalysisServicesServer_ParameterFilter
         }
 
         Context 'When connecting to the default instance using Windows Authentication' {
@@ -1428,13 +1477,37 @@ InModuleScope $script:subModuleName {
         }
 
         Context 'When connecting to the named instance using Windows Authentication impersonation' {
-            It 'Should not throw when connecting' {
-                $mockExpectedDataSource = "Data Source=$env:COMPUTERNAME\$mockInstanceName;User ID=$mockSqlCredentialUserName;Password=$mockSqlCredentialPassword"
+            Context 'When authentication without NetBIOS domain and Fully Qualified Domain Name (FQDN)' {
+                It 'Should not throw when connecting' {
+                    $mockExpectedDataSource = "Data Source=$env:COMPUTERNAME\$mockInstanceName;User ID=$mockSqlCredentialUserName;Password=$mockSqlCredentialPassword"
 
-                { Connect-SQLAnalysis -InstanceName $mockInstanceName -SetupCredential $mockSqlCredential } | Should -Not -Throw
+                    { Connect-SQLAnalysis -InstanceName $mockInstanceName -SetupCredential $mockSqlCredential } | Should -Not -Throw
 
-                Assert-MockCalled -CommandName New-Object -Exactly -Times 1 -Scope It `
-                    -ParameterFilter $mockNewObject_MicrosoftAnalysisServicesServer_ParameterFilter
+                    Assert-MockCalled -CommandName New-Object -Exactly -Times 1 -Scope It `
+                        -ParameterFilter $mockNewObject_MicrosoftAnalysisServicesServer_ParameterFilter
+                }
+            }
+
+            Context 'When authentication using NetBIOS domain' {
+                It 'Should not throw when connecting' {
+                    $mockExpectedDataSource = "Data Source=$env:COMPUTERNAME\$mockInstanceName;User ID=$mockNetBiosSqlCredentialUserName;Password=$mockNetBiosSqlCredentialPassword"
+
+                    { Connect-SQLAnalysis -InstanceName $mockInstanceName -SetupCredential $mockNetBiosSqlCredential } | Should -Not -Throw
+
+                    Assert-MockCalled -CommandName New-Object -Exactly -Times 1 -Scope It `
+                        -ParameterFilter $mockNewObject_MicrosoftAnalysisServicesServer_ParameterFilter
+                }
+            }
+
+            Context 'When authentication using Fully Qualified Domain Name (FQDN)' {
+                It 'Should not throw when connecting' {
+                    $mockExpectedDataSource = "Data Source=$env:COMPUTERNAME\$mockInstanceName;User ID=$mockFqdnSqlCredentialUserName;Password=$mockFqdnSqlCredentialPassword"
+
+                    { Connect-SQLAnalysis -InstanceName $mockInstanceName -SetupCredential $mockFqdnSqlCredential } | Should -Not -Throw
+
+                    Assert-MockCalled -CommandName New-Object -Exactly -Times 1 -Scope It `
+                        -ParameterFilter $mockNewObject_MicrosoftAnalysisServicesServer_ParameterFilter
+                }
             }
         }
 
@@ -1443,11 +1516,13 @@ InModuleScope $script:subModuleName {
                 $mockExpectedDataSource = ''
 
                 Mock -CommandName New-Object `
-                    -ParameterFilter $mockNewObject_MicrosoftAnalysisServicesServer_ParameterFilter `
-                    -Verifiable
+                    -ParameterFilter $mockNewObject_MicrosoftAnalysisServicesServer_ParameterFilter
 
-                $mockCorrectErrorMessage = ($script:localizedData.FailedToConnectToAnalysisServicesInstance -f $env:COMPUTERNAME)
-                { Connect-SQLAnalysis } | Should -Throw $mockCorrectErrorMessage
+                $mockErrorMessage = ($script:localizedData.FailedToConnectToAnalysisServicesInstance -f $env:COMPUTERNAME)
+
+                $mockErrorMessage | Should -Not -BeNullOrEmpty
+
+                { Connect-SQLAnalysis } | Should -Throw -ExpectedMessage $mockErrorMessage
 
                 Assert-MockCalled -CommandName New-Object -Exactly -Times 1 -Scope It `
                     -ParameterFilter $mockNewObject_MicrosoftAnalysisServicesServer_ParameterFilter
@@ -1461,8 +1536,11 @@ InModuleScope $script:subModuleName {
                 # Force the mock of Connect() method to throw 'Unable to connect.'
                 $mockThrowInvalidOperation = $true
 
-                $mockCorrectErrorMessage = ($script:localizedData.FailedToConnectToAnalysisServicesInstance -f $env:COMPUTERNAME)
-                { Connect-SQLAnalysis } | Should -Throw $mockCorrectErrorMessage
+                $mockErrorMessage = ($script:localizedData.FailedToConnectToAnalysisServicesInstance -f $env:COMPUTERNAME)
+
+                $mockErrorMessage | Should -Not -BeNullOrEmpty
+
+                { Connect-SQLAnalysis } | Should -Throw -ExpectedMessage $mockErrorMessage
 
                 Assert-MockCalled -CommandName New-Object -Exactly -Times 1 -Scope It `
                     -ParameterFilter $mockNewObject_MicrosoftAnalysisServicesServer_ParameterFilter
@@ -1482,15 +1560,16 @@ InModuleScope $script:subModuleName {
                     InstanceName = $mockInstanceName
                 }
 
-                $mockCorrectErrorMessage = ($script:localizedData.FailedToConnectToAnalysisServicesInstance -f "$($testParameters.ServerName)\$($testParameters.InstanceName)")
-                { Connect-SQLAnalysis @testParameters } | Should -Throw $mockCorrectErrorMessage
+                $mockErrorMessage = ($script:localizedData.FailedToConnectToAnalysisServicesInstance -f "$($testParameters.ServerName)\$($testParameters.InstanceName)")
+
+                $mockErrorMessage | Should -Not -BeNullOrEmpty
+
+                { Connect-SQLAnalysis @testParameters } | Should -Throw -ExpectedMessage $mockErrorMessage
 
                 Assert-MockCalled -CommandName New-Object -Exactly -Times 1 -Scope It `
                     -ParameterFilter $mockNewObject_MicrosoftAnalysisServicesServer_ParameterFilter
             }
         }
-
-        Assert-VerifiableMock
     }
 
     Describe 'SqlServerDsc.Common\Invoke-Query' -Tag 'InvokeQuery' {
@@ -1551,25 +1630,25 @@ InModuleScope $script:subModuleName {
             $mockThrowLocalizedMessage = {
                 throw $Message
             }
+
+            $queryParameters = @{
+                ServerName         = 'Server1'
+                InstanceName       = 'MSSQLSERVER'
+                Database           = 'master'
+                Query              = ''
+                DatabaseCredential = $mockSqlCredential
+            }
+
+            $queryParametersWithSMO = @{
+                Query              = ''
+                SqlServerObject    = $mockSMOServer
+                Database           = 'master'
+            }
         }
 
         BeforeEach {
-            Mock -CommandName Connect-SQL -MockWith $mockConnectSql -ModuleName $script:dscResourceName -Verifiable
-            Mock -CommandName New-InvalidOperationException -MockWith $mockThrowLocalizedMessage -Verifiable
-        }
-
-        $queryParameters = @{
-            ServerName         = 'Server1'
-            InstanceName       = 'MSSQLSERVER'
-            Database           = 'master'
-            Query              = ''
-            DatabaseCredential = $mockSqlCredential
-        }
-
-        $queryParametersWithSMO = @{
-            Query              = ''
-            SqlServerObject    = $mockSMOServer
-            Database           = 'master'
+            Mock -CommandName Connect-SQL -MockWith $mockConnectSql -ModuleName $script:dscResourceName
+            Mock -CommandName New-InvalidOperationException -MockWith $mockThrowLocalizedMessage
         }
 
         Context 'When executing a query with no results' {
@@ -1592,9 +1671,13 @@ InModuleScope $script:subModuleName {
             It 'Should throw the correct error, ExecuteNonQueryFailed, when executing the query fails' {
                 $queryParameters.Query = 'BadQuery'
 
-                { Invoke-Query @queryParameters } | Should -Throw (
+                $mockErrorMessage = (
                     $script:localizedData.ExecuteNonQueryFailed -f $queryParameters.Database
                 )
+
+                $mockErrorMessage | Should -Not -BeNullOrEmpty
+
+                { Invoke-Query @queryParameters } | Should -Throw $mockErrorMessage
             }
 
             Context 'When text should be redacted' {
@@ -1668,9 +1751,13 @@ InModuleScope $script:subModuleName {
             It 'Should throw the correct error, ExecuteQueryWithResultsFailed, when executing the query fails' {
                 $queryParameters.Query = 'BadQuery'
 
-                { Invoke-Query @queryParameters -WithResults } | Should -Throw (
+                $mockErrorMessage = (
                     $script:localizedData.ExecuteQueryWithResultsFailed -f $queryParameters.Database
                 )
+
+                $mockErrorMessage | Should -Not -BeNullOrEmpty
+
+                { Invoke-Query @queryParameters -WithResults } | Should -Throw $mockErrorMessage
 
                 Assert-MockCalled -CommandName Connect-SQL -Scope It -Times 1 -Exactly
             }
@@ -1717,9 +1804,13 @@ InModuleScope $script:subModuleName {
                 It 'Should throw the correct error, ExecuteNonQueryFailed, when executing the query fails' {
                     $queryParametersWithSMO.Query = 'BadQuery'
 
-                    { Invoke-Query @queryParametersWithSMO } | Should -Throw (
+                    $mockErrorMessage = (
                         $script:localizedData.ExecuteNonQueryFailed -f $queryParameters.Database
                     )
+
+                    $mockErrorMessage | Should -Not -BeNullOrEmpty
+
+                    { Invoke-Query @queryParametersWithSMO } | Should -Throw $mockErrorMessage
 
                     Assert-MockCalled -CommandName Connect-SQL -Scope It -Times 0 -Exactly
                 }
@@ -1738,9 +1829,13 @@ InModuleScope $script:subModuleName {
                 It 'Should throw the correct error, ExecuteQueryWithResultsFailed, when executing the query fails' {
                     $queryParametersWithSMO.Query = 'BadQuery'
 
-                    { Invoke-Query @queryParametersWithSMO -WithResults } | Should -Throw (
+                    $mockErrorMessage = (
                         $script:localizedData.ExecuteQueryWithResultsFailed -f $queryParameters.Database
                     )
+
+                    $mockErrorMessage | Should -Not -BeNullOrEmpty
+
+                    { Invoke-Query @queryParametersWithSMO -WithResults } | Should -Throw $mockErrorMessage
 
                     Assert-MockCalled -CommandName Connect-SQL -Scope It -Times 0 -Exactly
                 }
@@ -1760,10 +1855,14 @@ InModuleScope $script:subModuleName {
                 It 'Should throw the correct error, ExecuteQueryWithResultsFailed, when executing the query fails' {
                     $mockQuery = 'BadQuery'
 
+                    $mockErrorMessage = (
+                        $script:localizedData.ExecuteQueryWithResultsFailed -f $queryParameters.Database
+                    )
+
+                    $mockErrorMessage | Should -Not -BeNullOrEmpty
+
                     { $mockSMOServer | Invoke-Query -Query $mockQuery -Database master -WithResults } |
-                        Should -Throw (
-                            $script:localizedData.ExecuteQueryWithResultsFailed -f $queryParameters.Database
-                        )
+                        Should -Throw $mockErrorMessage
 
                     Assert-MockCalled -CommandName Connect-SQL -Scope It -Times 0 -Exactly
                 }
@@ -1784,63 +1883,80 @@ InModuleScope $script:subModuleName {
                 $availabilityReplica = New-Object -TypeName Microsoft.SqlServer.Management.Smo.AvailabilityReplica
                 $availabilityReplica.Name = 'AlterFailed'
 
-                { Update-AvailabilityGroupReplica -AvailabilityGroupReplica $availabilityReplica } | Should -Throw ($script:localizedData.AlterAvailabilityGroupReplicaFailed -f $availabilityReplica.Name)
+                #
+                $mockErrorRecord = Get-InvalidOperationRecord -Message (
+                    $script:localizedData.AlterAvailabilityGroupReplicaFailed -f $availabilityReplica.Name
+                )
+
+                $mockErrorMessage = $mockErrorRecord.Exception.Message
+
+                $mockErrorMessage | Should -Not -BeNullOrEmpty
+
+                # Support both Pester 4 and 5.
+                if ((Get-Module pester).Version -ge '5.0.0.0')
+                {
+                    $mockErrorMessage = $mockErrorMessage + '*'
+                }
+
+                { Update-AvailabilityGroupReplica -AvailabilityGroupReplica $availabilityReplica } |
+                    Should -Throw -ExpectedMessage $mockErrorMessage
             }
         }
     }
 
     Describe 'SqlServerDsc.Common\Test-LoginEffectivePermissions' -Tag 'TestLoginEffectivePermissions' {
+        BeforeAll {
+            $mockAllServerPermissionsPresent = @(
+                'Connect SQL',
+                'Alter Any Availability Group',
+                'View Server State'
+            )
 
-        $mockAllServerPermissionsPresent = @(
-            'Connect SQL',
-            'Alter Any Availability Group',
-            'View Server State'
-        )
+            $mockServerPermissionsMissing = @(
+                'Connect SQL',
+                'View Server State'
+            )
 
-        $mockServerPermissionsMissing = @(
-            'Connect SQL',
-            'View Server State'
-        )
+            $mockAllLoginPermissionsPresent = @(
+                'View Definition',
+                'Impersonate'
+            )
 
-        $mockAllLoginPermissionsPresent = @(
-            'View Definition',
-            'Impersonate'
-        )
+            $mockLoginPermissionsMissing = @(
+                'View Definition'
+            )
 
-        $mockLoginPermissionsMissing = @(
-            'View Definition'
-        )
+            $mockInvokeQueryPermissionsSet = @() # Will be set dynamically in the check
 
-        $mockInvokeQueryPermissionsSet = @() # Will be set dynamically in the check
-
-        $mockInvokeQueryPermissionsResult = {
-            return New-Object -TypeName PSObject -Property @{
-                Tables = @{
-                    Rows = @{
-                        permission_name = $mockInvokeQueryPermissionsSet
+            $mockInvokeQueryPermissionsResult = {
+                return New-Object -TypeName PSObject -Property @{
+                    Tables = @{
+                        Rows = @{
+                            permission_name = $mockInvokeQueryPermissionsSet
+                        }
                     }
                 }
             }
-        }
 
-        $testLoginEffectiveServerPermissionsParams = @{
-            ServerName = 'Server1'
-            InstanceName = 'MSSQLSERVER'
-            Login = 'NT SERVICE\ClusSvc'
-            Permissions = @()
-        }
+            $testLoginEffectiveServerPermissionsParams = @{
+                ServerName = 'Server1'
+                InstanceName = 'MSSQLSERVER'
+                Login = 'NT SERVICE\ClusSvc'
+                Permissions = @()
+            }
 
-        $testLoginEffectiveLoginPermissionsParams = @{
-            ServerName = 'Server1'
-            InstanceName = 'MSSQLSERVER'
-            Login = 'NT SERVICE\ClusSvc'
-            Permissions = @()
-            SecurableClass = 'LOGIN'
-            SecurableName = 'Login1'
+            $testLoginEffectiveLoginPermissionsParams = @{
+                ServerName = 'Server1'
+                InstanceName = 'MSSQLSERVER'
+                Login = 'NT SERVICE\ClusSvc'
+                Permissions = @()
+                SecurableClass = 'LOGIN'
+                SecurableName = 'Login1'
+            }
         }
 
         BeforeEach {
-            Mock -CommandName Invoke-Query -MockWith $mockInvokeQueryPermissionsResult -Verifiable
+            Mock -CommandName Invoke-Query -MockWith $mockInvokeQueryPermissionsResult
         }
 
         Context 'When all of the permissions are present' {
@@ -1918,20 +2034,24 @@ InModuleScope $script:subModuleName {
 
 
             $mockImportModule = {
-                if ($Name -ne $mockExpectedModuleNameToImport)
+                # Convert the single value array [String[]] to the expected string value [String].
+                $moduleNameToImport = $Name[0]
+
+                if ($moduleNameToImport -ne $mockExpectedModuleNameToImport)
                 {
-                    throw ('Wrong module was loaded. Expected {0}, but was {1}.' -f $mockExpectedModuleNameToImport, $Name[0])
+                    throw ('Wrong module was loaded. Expected {0}, but was {1}.' -f $mockExpectedModuleNameToImport, $moduleNameToImport)
                 }
 
-                switch ($Name)
+                switch ($moduleNameToImport)
                 {
                     'SqlServer'
                     {
                         $importModuleResult = @{
-                                ModuleType = 'Script'
-                                Version = '21.0.17279'
-                                Name = $Name
-                            }
+                            ModuleType = 'Script'
+                            Version = '21.0.17279'
+                            Name = $moduleNameToImport
+                            Path = 'C:\Program Files\WindowsPowerShell\Modules\sqlserver\21.0.17279\SqlServer.psm1'
+                        }
                     }
 
                     $sqlPsExpectedModulePath
@@ -2001,17 +2121,17 @@ InModuleScope $script:subModuleName {
             $mockThrowLocalizedMessage = {
                 throw $Message
             }
+
+            Mock -CommandName Set-PSModulePath
+            Mock -CommandName Push-Location
+            Mock -CommandName Pop-Location
+            Mock -CommandName New-InvalidOperationException -MockWith $mockThrowLocalizedMessage
         }
 
-        BeforeEach {
-            Mock -CommandName Push-Location -Verifiable
-            Mock -CommandName Pop-Location -Verifiable
-            Mock -CommandName Import-Module -MockWith $mockImportModule -Verifiable
-            Mock -CommandName New-InvalidOperationException -MockWith $mockThrowLocalizedMessage -Verifiable
-        }
 
         Context 'When module SqlServer is already loaded into the session' {
             BeforeAll {
+                Mock -CommandName Import-Module -MockWith $mockImportModule
                 Mock -CommandName Get-Module -MockWith {
                     return @{
                         Name = 'SqlServer'
@@ -2028,6 +2148,7 @@ InModuleScope $script:subModuleName {
 
         Context 'When module SQLPS is already loaded into the session' {
             BeforeAll {
+                Mock -CommandName Import-Module -MockWith $mockImportModule
                 Mock -CommandName Get-Module -MockWith {
                     return @{
                         Name = 'SQLPS'
@@ -2044,16 +2165,17 @@ InModuleScope $script:subModuleName {
 
         Context 'When module SqlServer exists, but not loaded into the session' {
             BeforeAll {
+                Mock -CommandName Import-Module -MockWith $mockImportModule
                 Mock -CommandName Get-Module -ParameterFilter {
                     $PSBoundParameters.ContainsKey('Name') -eq $true
                 }
+
+                Mock -CommandName Get-Module -MockWith $mockGetModuleSqlServer -ParameterFilter $mockGetModule_SqlServer_ParameterFilter
 
                 $mockExpectedModuleNameToImport = 'SqlServer'
             }
 
             It 'Should import the SqlServer module without throwing' {
-                Mock -CommandName Get-Module -MockWith $mockGetModuleSqlServer -ParameterFilter $mockGetModule_SqlServer_ParameterFilter -Verifiable
-
                 { Import-SQLPSModule } | Should -Not -Throw
 
                 Assert-MockCalled -CommandName Get-Module -ParameterFilter $mockGetModule_SqlServer_ParameterFilter -Exactly -Times 1 -Scope It
@@ -2065,20 +2187,21 @@ InModuleScope $script:subModuleName {
 
         Context 'When only module SQLPS exists, but not loaded into the session, and using -Force' {
             BeforeAll {
+                Mock -CommandName Import-Module -MockWith $mockImportModule
                 Mock -CommandName Remove-Module
                 Mock -CommandName Get-Module -ParameterFilter {
                     $PSBoundParameters.ContainsKey('Name') -eq $true
                 }
 
                 $mockExpectedModuleNameToImport = $sqlPsExpectedModulePath
+
+                Mock -CommandName Get-Module -MockWith $mockGetModuleSqlPs -ParameterFilter $mockGetModule_SQLPS_ParameterFilter
+                Mock -CommandName Get-Module -MockWith {
+                    return $null
+                } -ParameterFilter $mockGetModule_SqlServer_ParameterFilter
             }
 
             It 'Should import the SqlServer module without throwing' {
-                Mock -CommandName Get-Module -MockWith $mockGetModuleSqlPs -ParameterFilter $mockGetModule_SQLPS_ParameterFilter -Verifiable
-                Mock -CommandName Get-Module -MockWith {
-                    return $null
-                } -ParameterFilter $mockGetModule_SqlServer_ParameterFilter -Verifiable
-
                 { Import-SQLPSModule -Force } | Should -Not -Throw
 
                 Assert-MockCalled -CommandName Get-Module -ParameterFilter $mockGetModule_SqlServer_ParameterFilter -Exactly -Times 1 -Scope It
@@ -2091,12 +2214,20 @@ InModuleScope $script:subModuleName {
         }
 
         Context 'When neither SqlServer or SQLPS exists' {
-            $mockExpectedModuleNameToImport = $sqlPsExpectedModulePath
+            BeforeAll {
+                Mock -CommandName Import-Module
+
+                $mockExpectedModuleNameToImport = $sqlPsExpectedModulePath
+
+                Mock -CommandName Get-Module
+            }
 
             It 'Should throw the correct error message' {
-                Mock -CommandName Get-Module
+                $mockErrorMessage = $script:localizedData.PowerShellSqlModuleNotFound
 
-                { Import-SQLPSModule } | Should -Throw $script:localizedData.PowerShellSqlModuleNotFound
+                $mockErrorMessage | Should -Not -BeNullOrEmpty
+
+                { Import-SQLPSModule } | Should -Throw -ExpectedMessage $mockErrorMessage
 
                 Assert-MockCalled -CommandName Get-Module -ParameterFilter $mockGetModule_SqlServer_ParameterFilter -Exactly -Times 1 -Scope It
                 Assert-MockCalled -CommandName Get-Module -ParameterFilter $mockGetModule_SQLPS_ParameterFilter -Exactly -Times 1 -Scope It
@@ -2107,16 +2238,23 @@ InModuleScope $script:subModuleName {
         }
 
         Context 'When Import-Module fails to load the module' {
-            $mockExpectedModuleNameToImport = 'SqlServer'
+            BeforeAll {
+                $mockExpectedModuleNameToImport = 'SqlServer'
 
-            It 'Should throw the correct error message' {
-                $errorMessage = 'Mock Import-Module throwing a mocked error.'
-                Mock -CommandName Get-Module -MockWith $mockGetModuleSqlServer -ParameterFilter $mockGetModule_SqlServer_ParameterFilter -Verifiable
+                Mock -CommandName Get-Module -MockWith $mockGetModuleSqlServer -ParameterFilter $mockGetModule_SqlServer_ParameterFilter
                 Mock -CommandName Import-Module -MockWith {
                     throw $errorMessage
                 }
+            }
 
-                { Import-SQLPSModule } | Should -Throw ($script:localizedData.FailedToImportPowerShellSqlModule -f $mockExpectedModuleNameToImport)
+            It 'Should throw the correct error message' {
+                $errorMessage = 'Mock Import-Module throwing a mocked error.'
+
+                $mockErrorMessage = $script:localizedData.FailedToImportPowerShellSqlModule -f $mockExpectedModuleNameToImport
+
+                $mockErrorMessage | Should -Not -BeNullOrEmpty
+
+                { Import-SQLPSModule } | Should -Throw $mockErrorMessage
 
                 Assert-MockCalled -CommandName Get-Module -Exactly -Times 1 -Scope It
                 Assert-MockCalled -CommandName Push-Location -Exactly -Times 1 -Scope It
@@ -2127,12 +2265,19 @@ InModuleScope $script:subModuleName {
 
         # This is to test the tests (so the mock throws correctly)
         Context 'When mock Import-Module is called with wrong module name' {
-            $mockExpectedModuleNameToImport = 'UnknownModule'
+            BeforeAll {
+                $mockExpectedModuleNameToImport = 'UnknownModule'
+
+                Mock -CommandName Import-Module -MockWith $mockImportModule
+                Mock -CommandName Get-Module -MockWith $mockGetModuleSqlServer -ParameterFilter $mockGetModule_SqlServer_ParameterFilter
+            }
 
             It 'Should throw the correct error message' {
-                Mock -CommandName Get-Module -MockWith $mockGetModuleSqlServer -ParameterFilter $mockGetModule_SqlServer_ParameterFilter -Verifiable
+                $mockErrorMessage = $script:localizedData.FailedToImportPowerShellSqlModule -f 'SqlServer'
 
-                { Import-SQLPSModule } | Should -Throw ($script:localizedData.FailedToImportPowerShellSqlModule -f 'SqlServer')
+                $mockErrorMessage | Should -Not -BeNullOrEmpty
+
+                { Import-SQLPSModule } | Should -Throw $mockErrorMessage
 
                 Assert-MockCalled -CommandName Get-Module -Exactly -Times 1 -Scope It
                 Assert-MockCalled -CommandName Push-Location -Exactly -Times 1 -Scope It
@@ -2140,8 +2285,6 @@ InModuleScope $script:subModuleName {
                 Assert-MockCalled -CommandName Import-Module -Exactly -Times 1 -Scope It
             }
         }
-
-        Assert-VerifiableMock
     }
 
     Describe 'SqlServerDsc.Common\Get-SqlInstanceMajorVersion' -Tag 'GetSqlInstanceMajorVersion' {
@@ -2179,13 +2322,11 @@ InModuleScope $script:subModuleName {
         BeforeEach {
             Mock -CommandName Get-ItemProperty `
                 -ParameterFilter $mockGetItemProperty_ParameterFilter_MicrosoftSQLServer_InstanceNames_SQL `
-                -MockWith $mockGetItemProperty_MicrosoftSQLServer_InstanceNames_SQL `
-                -Verifiable
+                -MockWith $mockGetItemProperty_MicrosoftSQLServer_InstanceNames_SQL
 
             Mock -CommandName Get-ItemProperty `
                 -ParameterFilter $mockGetItemProperty_ParameterFilter_MicrosoftSQLServer_FullInstanceId_Setup `
-                -MockWith $mockGetItemProperty_MicrosoftSQLServer_FullInstanceId_Setup `
-                -Verifiable
+                -MockWith $mockGetItemProperty_MicrosoftSQLServer_FullInstanceId_Setup
         }
 
         $mockInstance_InstanceId = "MSSQL$($mockSqlMajorVersion).$($mockInstanceName)"
@@ -2209,10 +2350,15 @@ InModuleScope $script:subModuleName {
                     -ParameterFilter $mockGetItemProperty_ParameterFilter_MicrosoftSQLServer_FullInstanceId_Setup `
                     -MockWith {
                         return New-Object -TypeName Object
-                    } -Verifiable
+                    }
 
-                $mockCorrectErrorMessage = ($script:localizedData.SqlServerVersionIsInvalid -f $mockInstanceName)
-                { Get-SqlInstanceMajorVersion -InstanceName $mockInstanceName } | Should -Throw $mockCorrectErrorMessage
+                $mockErrorMessage = Get-InvalidResultRecord -Message (
+                    $script:localizedData.SqlServerVersionIsInvalid -f $mockInstanceName
+                )
+
+                $mockErrorMessage | Should -Not -BeNullOrEmpty
+
+                { Get-SqlInstanceMajorVersion -InstanceName $mockInstanceName } | Should -Throw -ExpectedMessage $mockErrorMessage
 
                 Assert-MockCalled -CommandName Get-ItemProperty -Exactly -Times 1 -Scope It `
                     -ParameterFilter $mockGetItemProperty_ParameterFilter_MicrosoftSQLServer_InstanceNames_SQL
@@ -2221,8 +2367,6 @@ InModuleScope $script:subModuleName {
                     -ParameterFilter $mockGetItemProperty_ParameterFilter_MicrosoftSQLServer_FullInstanceId_Setup
             }
         }
-
-        Assert-VerifiableMock
     }
 
     Describe 'SqlServerDsc.Common\Get-PrimaryReplicaServerObject' -Tag 'GetPrimaryReplicaServerObject' {
@@ -2232,34 +2376,34 @@ InModuleScope $script:subModuleName {
 
             $mockAvailabilityGroup = New-Object -TypeName Microsoft.SqlServer.Management.Smo.AvailabilityGroup
             $mockAvailabilityGroup.PrimaryReplicaServerName = 'Server1'
-        }
 
-        $mockConnectSql = {
-            param
-            (
-                [Parameter()]
-                [System.String]
-                $ServerName,
-
-                [Parameter()]
-                [System.String]
-                $InstanceName
-            )
-
-            $mock = @(
+            $mockConnectSql = {
+                param
                 (
-                    New-Object -TypeName Object |
-                        Add-Member -MemberType NoteProperty -Name 'DomainInstanceName' -Value $ServerName -PassThru
+                    [Parameter()]
+                    [System.String]
+                    $ServerName,
+
+                    [Parameter()]
+                    [System.String]
+                    $InstanceName
                 )
-            )
 
-            # Type the mock as a server object
-            $mock.PSObject.TypeNames.Insert(0,'Microsoft.SqlServer.Management.Smo.Server')
+                $mock = @(
+                    (
+                        New-Object -TypeName Object |
+                            Add-Member -MemberType NoteProperty -Name 'DomainInstanceName' -Value $ServerName -PassThru
+                    )
+                )
 
-            return $mock
+                # Type the mock as a server object
+                $mock.PSObject.TypeNames.Insert(0,'Microsoft.SqlServer.Management.Smo.Server')
+
+                return $mock
+            }
+
+            Mock -CommandName Connect-SQL -MockWith $mockConnectSql
         }
-
-        Mock -CommandName Connect-SQL -MockWith $mockConnectSql -Verifiable
 
         Context 'When the supplied server object is the primary replica' {
             It 'Should return the same server object that was supplied' {
@@ -2298,21 +2442,8 @@ InModuleScope $script:subModuleName {
     }
 
     Describe 'SqlServerDsc.Common\Test-AvailabilityReplicaSeedingModeAutomatic' -Tag 'TestAvailabilityReplicaSeedingModeAutomatic' {
-
-        BeforeEach {
-            $mockSqlVersion = 13
+        BeforeAll {
             $mockConnectSql = {
-                param
-                (
-                    [Parameter()]
-                    [System.String]
-                    $ServerName,
-
-                    [Parameter()]
-                    [System.String]
-                    $InstanceName
-                )
-
                 $mock = @(
                     (
                         New-Object -TypeName Object |
@@ -2337,58 +2468,97 @@ InModuleScope $script:subModuleName {
                 }
             }
 
-            Mock -CommandName Connect-SQL -MockWith $mockConnectSql -Verifiable
-            Mock -CommandName Invoke-Query -MockWith $mockInvokeQuery -Verifiable
-        }
-
-        $testAvailabilityReplicaSeedingModeAutomaticParams = @{
-            ServerName              = 'Server1'
-            InstanceName            = 'MSSQLSERVER'
-            AvailabilityGroupName   = 'Group1'
-            AvailabilityReplicaName = 'Replica2'
+            $testAvailabilityReplicaSeedingModeAutomaticParams = @{
+                ServerName              = 'Server1'
+                InstanceName            = 'MSSQLSERVER'
+                AvailabilityGroupName   = 'Group1'
+                AvailabilityReplicaName = 'Replica2'
+            }
         }
 
         Context 'When the replica seeding mode is manual' {
-            # Test SQL 2012 and 2014. Not testing earlier versions because Availability Groups were introduced in SQL 2012.
-            foreach ( $instanceVersion in @(11,12) )
-            {
-                It ( 'Should return $false when the instance version is {0}' -f $instanceVersion ) {
-                    $mockSqlVersion = $instanceVersion
-
-                    Test-AvailabilityReplicaSeedingModeAutomatic @testAvailabilityReplicaSeedingModeAutomaticParams | Should -Be $false
-
-                    Assert-MockCalled -CommandName Connect-SQL -Scope It -Times 1 -Exactly
-                    Assert-MockCalled -CommandName Invoke-Query -Scope It -Times 0 -Exactly
-                }
+            BeforeEach {
+                Mock -CommandName Connect-SQL -MockWith $mockConnectSql
+                Mock -CommandName Invoke-Query -MockWith $mockInvokeQuery
             }
 
-            # Test SQL 2016 and later
-            foreach ( $instanceVersion in @(13,14) )
-            {
-                It ( 'Should return $false when the instance version is {0} and the replica seeding mode is manual' -f $instanceVersion ) {
-                    $mockSqlVersion = $instanceVersion
-
-                    Test-AvailabilityReplicaSeedingModeAutomatic @testAvailabilityReplicaSeedingModeAutomaticParams | Should -Be $false
-
-                    Assert-MockCalled -CommandName Connect-SQL -Scope It -Times 1 -Exactly
-                    Assert-MockCalled -CommandName Invoke-Query -Scope It -Times 1 -Exactly
+            It 'Should return $false when the instance version is <Version>' -TestCase @(
+                @{
+                    Version = 11
                 }
+                @{
+                    Version = 12
+                }
+            ) {
+                param
+                (
+                    $Version
+                )
+
+                $mockSqlVersion = $Version
+
+                Test-AvailabilityReplicaSeedingModeAutomatic @testAvailabilityReplicaSeedingModeAutomaticParams | Should -Be $false
+
+                Assert-MockCalled -CommandName Connect-SQL -Scope It -Times 1 -Exactly
+                Assert-MockCalled -CommandName Invoke-Query -Scope It -Times 0 -Exactly
+            }
+
+            # Test SQL 2016 and later where Seeding Mode is supported.
+            It 'Should return $false when the instance version is <Version> and the replica seeding mode is manual' -TestCases @(
+                @{
+                    Version = 13
+                }
+                @{
+                    Version = 14
+                }
+                @{
+                    Version = 15
+                }
+            ) {
+                param
+                (
+                    $Version
+                )
+
+                $mockSqlVersion = $Version
+
+                Test-AvailabilityReplicaSeedingModeAutomatic @testAvailabilityReplicaSeedingModeAutomaticParams | Should -Be $false
+
+                Assert-MockCalled -CommandName Connect-SQL -Scope It -Times 1 -Exactly
+                Assert-MockCalled -CommandName Invoke-Query -Scope It -Times 1 -Exactly
             }
         }
 
         Context 'When the replica seeding mode is automatic' {
-            # Test SQL 2016 and later
-            foreach ( $instanceVersion in @(13,14) )
-            {
-                It ( 'Should return $true when the instance version is {0} and the replica seeding mode is automatic' -f $instanceVersion ) {
-                    $mockSqlVersion = $instanceVersion
-                    $mockSeedingMode = 'Automatic'
+            BeforeEach {
+                Mock -CommandName Connect-SQL -MockWith $mockConnectSql
+                Mock -CommandName Invoke-Query -MockWith $mockInvokeQuery
+            }
 
-                    Test-AvailabilityReplicaSeedingModeAutomatic @testAvailabilityReplicaSeedingModeAutomaticParams | Should -Be $true
-
-                    Assert-MockCalled -CommandName Connect-SQL -Scope It -Times 1 -Exactly
-                    Assert-MockCalled -CommandName Invoke-Query -Scope It -Times 1 -Exactly
+            # Test SQL 2016 and later where Seeding Mode is supported.
+            It 'Should return $true when the instance version is <Version> and the replica seeding mode is automatic' -TestCases @(
+                @{
+                    Version = 13
                 }
+                @{
+                    Version = 14
+                }
+                @{
+                    Version = 15
+                }
+            ) {
+                param
+                (
+                    $Version
+                )
+
+                $mockSqlVersion = $Version
+                $mockSeedingMode = 'Automatic'
+
+                Test-AvailabilityReplicaSeedingModeAutomatic @testAvailabilityReplicaSeedingModeAutomaticParams | Should -Be $true
+
+                Assert-MockCalled -CommandName Connect-SQL -Scope It -Times 1 -Exactly
+                Assert-MockCalled -CommandName Invoke-Query -Scope It -Times 1 -Exactly
             }
         }
     }
@@ -2421,36 +2591,36 @@ InModuleScope $script:subModuleName {
         }
 
         BeforeEach {
-            Mock -CommandName Test-LoginEffectivePermissions -ParameterFilter $mockTestLoginEffectivePermissions_ImpersonateAnyLogin_ParameterFilter -MockWith { $false } -Verifiable
-            Mock -CommandName Test-LoginEffectivePermissions -ParameterFilter $mockTestLoginEffectivePermissions_ControlServer_ParameterFilter -MockWith { $false } -Verifiable
-            Mock -CommandName Test-LoginEffectivePermissions -ParameterFilter $mockTestLoginEffectivePermissions_ImpersonateLogin_ParameterFilter -MockWith { $false } -Verifiable
-            Mock -CommandName Test-LoginEffectivePermissions -ParameterFilter $mockTestLoginEffectivePermissions_ControlLogin_ParameterFilter -MockWith { $false } -Verifiable
+            Mock -CommandName Test-LoginEffectivePermissions -ParameterFilter $mockTestLoginEffectivePermissions_ImpersonateAnyLogin_ParameterFilter -MockWith { $false }
+            Mock -CommandName Test-LoginEffectivePermissions -ParameterFilter $mockTestLoginEffectivePermissions_ControlServer_ParameterFilter -MockWith { $false }
+            Mock -CommandName Test-LoginEffectivePermissions -ParameterFilter $mockTestLoginEffectivePermissions_ImpersonateLogin_ParameterFilter -MockWith { $false }
+            Mock -CommandName Test-LoginEffectivePermissions -ParameterFilter $mockTestLoginEffectivePermissions_ControlLogin_ParameterFilter -MockWith { $false }
         }
 
         Context 'When impersonate permissions are present for the login' {
             It 'Should return true when the impersonate any login permissions are present for the login' {
-                Mock -CommandName Test-LoginEffectivePermissions -ParameterFilter $mockTestLoginEffectivePermissions_ImpersonateAnyLogin_ParameterFilter -MockWith { $true } -Verifiable
+                Mock -CommandName Test-LoginEffectivePermissions -ParameterFilter $mockTestLoginEffectivePermissions_ImpersonateAnyLogin_ParameterFilter -MockWith { $true }
                 Test-ImpersonatePermissions -ServerObject $mockServerObject | Should -Be $true
 
                 Assert-MockCalled -CommandName Test-LoginEffectivePermissions -ParameterFilter $mockTestLoginEffectivePermissions_ImpersonateAnyLogin_ParameterFilter -Scope It -Times 1 -Exactly
             }
 
             It 'Should return true when the control server permissions are present for the login' {
-                Mock -CommandName Test-LoginEffectivePermissions -ParameterFilter $mockTestLoginEffectivePermissions_ControlServer_ParameterFilter -MockWith { $true } -Verifiable
+                Mock -CommandName Test-LoginEffectivePermissions -ParameterFilter $mockTestLoginEffectivePermissions_ControlServer_ParameterFilter -MockWith { $true }
                 Test-ImpersonatePermissions -ServerObject $mockServerObject | Should -Be $true
 
                 Assert-MockCalled -CommandName Test-LoginEffectivePermissions -ParameterFilter $mockTestLoginEffectivePermissions_ControlServer_ParameterFilter -Scope It -Times 1 -Exactly
             }
 
             It 'Should return true when the impersonate login permissions are present for the login' {
-                Mock -CommandName Test-LoginEffectivePermissions -ParameterFilter $mockTestLoginEffectivePermissions_ImpersonateLogin_ParameterFilter -MockWith { $true } -Verifiable
+                Mock -CommandName Test-LoginEffectivePermissions -ParameterFilter $mockTestLoginEffectivePermissions_ImpersonateLogin_ParameterFilter -MockWith { $true }
                 Test-ImpersonatePermissions -ServerObject $mockServerObject -SecurableName 'Login1' | Should -Be $true
 
                 Assert-MockCalled -CommandName Test-LoginEffectivePermissions -ParameterFilter $mockTestLoginEffectivePermissions_ImpersonateLogin_ParameterFilter -Scope It -Times 1 -Exactly
             }
 
             It 'Should return true when the control login permissions are present for the login' {
-                Mock -CommandName Test-LoginEffectivePermissions -ParameterFilter $mockTestLoginEffectivePermissions_ControlLogin_ParameterFilter -MockWith { $true } -Verifiable
+                Mock -CommandName Test-LoginEffectivePermissions -ParameterFilter $mockTestLoginEffectivePermissions_ControlLogin_ParameterFilter -MockWith { $true }
                 Test-ImpersonatePermissions -ServerObject $mockServerObject -SecurableName 'Login1' | Should -Be $true
 
                 Assert-MockCalled -CommandName Test-LoginEffectivePermissions -ParameterFilter $mockTestLoginEffectivePermissions_ControlLogin_ParameterFilter -Scope It -Times 1 -Exactly
@@ -2565,15 +2735,19 @@ InModuleScope $script:subModuleName {
             $mockWinCredentialPassword = 'StrongerOne7.'
             $mockWinCredentialSecurePassword = ConvertTo-SecureString -String $mockWinCredentialPassword -AsPlainText -Force
             $mockWinCredential = New-Object -TypeName PSCredential -ArgumentList ($mockWinCredentialUserName, $mockWinCredentialSecurePassword)
+
+            $mockWinFqdnCredentialUserName = 'TestUserName12345@domain.local'
+            $mockWinFqdnCredentialPassword = 'StrongerOne7.'
+            $mockWinFqdnCredentialSecurePassword = ConvertTo-SecureString -String $mockWinFqdnCredentialPassword -AsPlainText -Force
+            $mockWinFqdnCredential = New-Object -TypeName PSCredential -ArgumentList ($mockWinFqdnCredentialUserName, $mockWinFqdnCredentialSecurePassword)
         }
 
         BeforeEach {
-            Mock -CommandName New-InvalidOperationException -MockWith $mockThrowLocalizedMessage -Verifiable
+            Mock -CommandName New-InvalidOperationException -MockWith $mockThrowLocalizedMessage
             Mock -CommandName Import-SQLPSModule
             Mock -CommandName New-Object `
                 -MockWith $mockNewObject_MicrosoftDatabaseEngine `
-                -ParameterFilter $mockNewObject_MicrosoftDatabaseEngine_ParameterFilter `
-                -Verifiable
+                -ParameterFilter $mockNewObject_MicrosoftDatabaseEngine_ParameterFilter
         }
 
         Context 'When connecting to the default instance using integrated Windows Authentication' {
@@ -2669,7 +2843,7 @@ InModuleScope $script:subModuleName {
                     $databaseEngineServerObject.ConnectionContext.ServerInstance | Should -BeExactly "$mockExpectedDatabaseEngineServer\$mockExpectedDatabaseEngineInstance"
                     $databaseEngineServerObject.ConnectionContext.ConnectAsUser | Should -Be $true
                     $databaseEngineServerObject.ConnectionContext.ConnectAsUserPassword | Should -BeExactly $mockWinCredential.GetNetworkCredential().Password
-                    $databaseEngineServerObject.ConnectionContext.ConnectAsUserName | Should -BeExactly $mockWinCredential.GetNetworkCredential().UserName
+                    $databaseEngineServerObject.ConnectionContext.ConnectAsUserName | Should -BeExactly $mockWinCredential.UserName
                     $databaseEngineServerObject.ConnectionContext.ConnectAsUser | Should -Be $true
                     $databaseEngineServerObject.ConnectionContext.LoginSecure | Should -Be $true
 
@@ -2679,26 +2853,52 @@ InModuleScope $script:subModuleName {
             }
 
             Context 'When using the default login type' {
-                BeforeAll {
-                    $testParameters = @{
-                        ServerName = $mockExpectedDatabaseEngineServer
-                        InstanceName = $mockExpectedDatabaseEngineInstance
-                        SetupCredential = $mockWinCredential
-                        LoginType = 'WindowsUser'
+                Context 'When authenticating using NetBIOS domain' {
+                    BeforeAll {
+                        $testParameters = @{
+                            ServerName = $mockExpectedDatabaseEngineServer
+                            InstanceName = $mockExpectedDatabaseEngineInstance
+                            SetupCredential = $mockWinCredential
+                            LoginType = 'WindowsUser'
+                        }
+                    }
+
+                    It 'Should return the correct service instance' {
+                        $databaseEngineServerObject = Connect-SQL @testParameters
+                        $databaseEngineServerObject.ConnectionContext.ServerInstance | Should -BeExactly "$mockExpectedDatabaseEngineServer\$mockExpectedDatabaseEngineInstance"
+                        $databaseEngineServerObject.ConnectionContext.ConnectAsUser | Should -Be $true
+                        $databaseEngineServerObject.ConnectionContext.ConnectAsUserPassword | Should -BeExactly $mockWinCredential.GetNetworkCredential().Password
+                        $databaseEngineServerObject.ConnectionContext.ConnectAsUserName | Should -BeExactly $mockWinCredential.UserName
+                        $databaseEngineServerObject.ConnectionContext.ConnectAsUser | Should -Be $true
+                        $databaseEngineServerObject.ConnectionContext.LoginSecure | Should -Be $true
+
+                        Assert-MockCalled -CommandName New-Object -Exactly -Times 1 -Scope It `
+                            -ParameterFilter $mockNewObject_MicrosoftDatabaseEngine_ParameterFilter
                     }
                 }
 
-                It 'Should return the correct service instance' {
-                    $databaseEngineServerObject = Connect-SQL @testParameters
-                    $databaseEngineServerObject.ConnectionContext.ServerInstance | Should -BeExactly "$mockExpectedDatabaseEngineServer\$mockExpectedDatabaseEngineInstance"
-                    $databaseEngineServerObject.ConnectionContext.ConnectAsUser | Should -Be $true
-                    $databaseEngineServerObject.ConnectionContext.ConnectAsUserPassword | Should -BeExactly $mockWinCredential.GetNetworkCredential().Password
-                    $databaseEngineServerObject.ConnectionContext.ConnectAsUserName | Should -BeExactly $mockWinCredential.GetNetworkCredential().UserName
-                    $databaseEngineServerObject.ConnectionContext.ConnectAsUser | Should -Be $true
-                    $databaseEngineServerObject.ConnectionContext.LoginSecure | Should -Be $true
+                Context 'When authenticating using Fully Qualified Domain Name (FQDN)' {
+                    BeforeAll {
+                        $testParameters = @{
+                            ServerName = $mockExpectedDatabaseEngineServer
+                            InstanceName = $mockExpectedDatabaseEngineInstance
+                            SetupCredential = $mockWinFqdnCredential
+                            LoginType = 'WindowsUser'
+                        }
+                    }
 
-                    Assert-MockCalled -CommandName New-Object -Exactly -Times 1 -Scope It `
-                        -ParameterFilter $mockNewObject_MicrosoftDatabaseEngine_ParameterFilter
+                    It 'Should return the correct service instance' {
+                        $databaseEngineServerObject = Connect-SQL @testParameters
+                        $databaseEngineServerObject.ConnectionContext.ServerInstance | Should -BeExactly "$mockExpectedDatabaseEngineServer\$mockExpectedDatabaseEngineInstance"
+                        $databaseEngineServerObject.ConnectionContext.ConnectAsUser | Should -Be $true
+                        $databaseEngineServerObject.ConnectionContext.ConnectAsUserPassword | Should -BeExactly $mockWinFqdnCredential.GetNetworkCredential().Password
+                        $databaseEngineServerObject.ConnectionContext.ConnectAsUserName | Should -BeExactly $mockWinFqdnCredential.UserName
+                        $databaseEngineServerObject.ConnectionContext.ConnectAsUser | Should -Be $true
+                        $databaseEngineServerObject.ConnectionContext.LoginSecure | Should -Be $true
+
+                        Assert-MockCalled -CommandName New-Object -Exactly -Times 1 -Scope It `
+                            -ParameterFilter $mockNewObject_MicrosoftDatabaseEngine_ParameterFilter
+                    }
                 }
             }
         }
@@ -2710,21 +2910,21 @@ InModuleScope $script:subModuleName {
 
                 Mock -CommandName New-Object `
                     -MockWith $mockNewObject_MicrosoftDatabaseEngine `
-                    -ParameterFilter $mockNewObject_MicrosoftDatabaseEngine_ParameterFilter `
-                    -Verifiable
+                    -ParameterFilter $mockNewObject_MicrosoftDatabaseEngine_ParameterFilter
 
-                $mockCorrectErrorMessage = ($script:localizedData.FailedToConnectToDatabaseEngineInstance -f $mockExpectedDatabaseEngineServer)
-                { Connect-SQL } | Should -Throw $mockCorrectErrorMessage
+                $mockErrorMessage = $script:localizedData.FailedToConnectToDatabaseEngineInstance -f $mockExpectedDatabaseEngineServer
+
+                $mockErrorMessage | Should -Not -BeNullOrEmpty
+
+                { Connect-SQL } | Should -Throw -ExpectedMessage $mockErrorMessage
 
                 Assert-MockCalled -CommandName New-Object -Exactly -Times 1 -Scope It `
                     -ParameterFilter $mockNewObject_MicrosoftDatabaseEngine_ParameterFilter
             }
         }
-
-        Assert-VerifiableMock
     }
 
-    Describe 'SqlServerDsc.Common\Split-FullSqlInstanceName' {
+    Describe 'SqlServerDsc.Common\Split-FullSqlInstanceName' -Tag 'SplitFullSqlInstanceName' {
         Context 'When the "FullSqlInstanceName" parameter is not supplied' {
             It 'Should throw when the "FullSqlInstanceName" parameter is $null' {
                 { Split-FullSqlInstanceName -FullSqlInstanceName $null } | Should -Throw
@@ -2754,17 +2954,17 @@ InModuleScope $script:subModuleName {
         }
     }
 
-    Describe 'SqlServerDsc.Common\Test-ClusterPermissions' {
+    Describe 'SqlServerDsc.Common\Test-ClusterPermissions' -Tag 'TestClusterPermissions' {
         BeforeAll {
             Mock -CommandName Test-LoginEffectivePermissions -MockWith {
                 $mockClusterServicePermissionsPresent
-            } -Verifiable -ParameterFilter {
+            } -ParameterFilter {
                 $LoginName -eq $clusterServiceName
             }
 
             Mock -CommandName Test-LoginEffectivePermissions -MockWith {
                 $mockSystemPermissionsPresent
-            } -Verifiable -ParameterFilter {
+            } -ParameterFilter {
                 $LoginName -eq $systemAccountName
             }
 
@@ -2792,7 +2992,7 @@ InModuleScope $script:subModuleName {
             It "Should throw the correct error when the logins '$($clusterServiceName)' or '$($systemAccountName)' are absent" {
                 $mockServerObject.Logins = @{}
 
-                { Test-ClusterPermissions -ServerObject $mockServerObject } | Should -Throw ( "The cluster does not have permissions to manage the Availability Group on '{0}\{1}'. Grant 'Connect SQL', 'Alter Any Availability Group', and 'View Server State' to either '$($clusterServiceName)' or '$($systemAccountName)'." -f $mockServerObject.NetName,$mockServerObject.ServiceName )
+                { Test-ClusterPermissions -ServerObject $mockServerObject } | Should -Throw ( "The cluster does not have permissions to manage the Availability Group on '{0}\{1}'. Grant 'Connect SQL', 'Alter Any Availability Group', and 'View Server State' to either '$($clusterServiceName)' or '$($systemAccountName)'. (SQLCOMMON0049)" -f $mockServerObject.NetName,$mockServerObject.ServiceName )
 
                 Assert-MockCalled -CommandName Test-LoginEffectivePermissions -Scope It -Times 0 -Exactly -ParameterFilter {
                     $LoginName -eq $clusterServiceName
@@ -2803,7 +3003,7 @@ InModuleScope $script:subModuleName {
             }
 
             It "Should throw the correct error when the logins '$($clusterServiceName)' and '$($systemAccountName)' do not have permissions to manage availability groups" {
-                { Test-ClusterPermissions -ServerObject $mockServerObject } | Should -Throw ( "The cluster does not have permissions to manage the Availability Group on '{0}\{1}'. Grant 'Connect SQL', 'Alter Any Availability Group', and 'View Server State' to either '$($clusterServiceName)' or '$($systemAccountName)'." -f $mockServerObject.NetName,$mockServerObject.ServiceName )
+                { Test-ClusterPermissions -ServerObject $mockServerObject } | Should -Throw ( "The cluster does not have permissions to manage the Availability Group on '{0}\{1}'. Grant 'Connect SQL', 'Alter Any Availability Group', and 'View Server State' to either '$($clusterServiceName)' or '$($systemAccountName)'. (SQLCOMMON0049)" -f $mockServerObject.NetName,$mockServerObject.ServiceName )
 
                 Assert-MockCalled -CommandName Test-LoginEffectivePermissions -Scope It -Times 1 -Exactly -ParameterFilter {
                     $LoginName -eq $clusterServiceName
@@ -2870,8 +3070,8 @@ InModuleScope $script:subModuleName {
                 $mockDynamicDependedServiceName = $mockDependedServiceName
                 $mockDynamicServiceDisplayName = 'Reporting Services (MSSQLSERVER)'
 
-                Mock -CommandName Stop-Service -Verifiable
-                Mock -CommandName Start-Service -Verifiable
+                Mock -CommandName Stop-Service
+                Mock -CommandName Start-Service
                 Mock -CommandName Get-Service -MockWith $mockGetService
             }
 
@@ -2895,8 +3095,8 @@ InModuleScope $script:subModuleName {
                 $mockDynamicDependedServiceName = $mockDependedServiceName
                 $mockDynamicServiceDisplayName = 'Reporting Services'
 
-                Mock -CommandName Stop-Service -Verifiable
-                Mock -CommandName Start-Service -Verifiable
+                Mock -CommandName Stop-Service
+                Mock -CommandName Start-Service
                 Mock -CommandName Get-Service -MockWith $mockGetService
             }
 
@@ -2920,8 +3120,8 @@ InModuleScope $script:subModuleName {
                 $mockDynamicDependedServiceName = $mockDependedServiceName
                 $mockDynamicServiceDisplayName = 'Reporting Services (TEST)'
 
-                Mock -CommandName Stop-Service -Verifiable
-                Mock -CommandName Start-Service -Verifiable
+                Mock -CommandName Stop-Service
+                Mock -CommandName Start-Service
                 Mock -CommandName Get-Service -MockWith $mockGetService
             }
 
@@ -2945,9 +3145,9 @@ InModuleScope $script:subModuleName {
                 $mockDynamicDependedServiceName = $mockDependedServiceName
                 $mockDynamicServiceDisplayName = 'Reporting Services (TEST)'
 
-                Mock -CommandName Start-Sleep -Verifiable
-                Mock -CommandName Stop-Service -Verifiable
-                Mock -CommandName Start-Service -Verifiable
+                Mock -CommandName Start-Sleep
+                Mock -CommandName Stop-Service
+                Mock -CommandName Start-Service
                 Mock -CommandName Get-Service -MockWith $mockGetService
             }
 
@@ -2967,17 +3167,6 @@ InModuleScope $script:subModuleName {
     Describe 'SqlServerDsc.Common\Test-ActiveNode' -Tag 'TestActiveNode' {
         BeforeAll {
             $mockServerObject = New-Object -TypeName Microsoft.SqlServer.Management.Smo.Server
-
-            $failoverClusterInstanceTestCases = @(
-                @{
-                    ComputerNamePhysicalNetBIOS = $env:COMPUTERNAME
-                    Result = $true
-                },
-                @{
-                    ComputerNamePhysicalNetBIOS = 'AnotherNode'
-                    Result = $false
-                }
-            )
         }
 
         Context 'When function is executed on a standalone instance' {
@@ -2985,8 +3174,8 @@ InModuleScope $script:subModuleName {
                 $mockServerObject.IsMemberOfWsfcCluster = $false
             }
 
-            It 'Should return "$true"' {
-                Test-ActiveNode -ServerObject $mockServerObject | Should Be $true
+            It 'Should return $true' {
+                Test-ActiveNode -ServerObject $mockServerObject | Should -BeTrue
             }
         }
 
@@ -2995,7 +3184,16 @@ InModuleScope $script:subModuleName {
                 $mockServerObject.IsMemberOfWsfcCluster = $true
             }
 
-            It 'Should return "<Result>" when the node name is "<ComputerNamePhysicalNetBIOS>"' -TestCases $failoverClusterInstanceTestCases {
+            It 'Should return <Result> when the node name is <ComputerNamePhysicalNetBIOS>' -TestCases @(
+                @{
+                    ComputerNamePhysicalNetBIOS = $env:COMPUTERNAME
+                    Result = $true
+                },
+                @{
+                    ComputerNamePhysicalNetBIOS = 'AnotherNode'
+                    Result = $false
+                }
+            ) {
                 param
                 (
                     $ComputerNamePhysicalNetBIOS,
@@ -3004,7 +3202,7 @@ InModuleScope $script:subModuleName {
 
                 $mockServerObject.ComputerNamePhysicalNetBIOS = $ComputerNamePhysicalNetBIOS
 
-                Test-ActiveNode -ServerObject $mockServerObject | Should Be $Result
+                Test-ActiveNode -ServerObject $mockServerObject | Should -Be $Result
             }
         }
     }
@@ -3023,14 +3221,16 @@ InModuleScope $script:subModuleName {
         }
 
         Context 'Invoke-SqlScript fails to import SQLPS module' {
-            $throwMessage = "Failed to import SQLPS module."
+            BeforeAll {
+                $throwMessage = "Failed to import SQLPS module."
 
-            Mock -CommandName Import-SQLPSModule -MockWith {
-                throw $throwMessage
+                Mock -CommandName Import-SQLPSModule -MockWith {
+                    throw $throwMessage
+                }
             }
 
             It 'Should throw the correct error from Import-Module' {
-                { Invoke-SqlScript @invokeScriptFileParameters } | Should Throw $throwMessage
+                { Invoke-SqlScript @invokeScriptFileParameters } | Should -Throw $throwMessage
             }
         }
 
@@ -3042,7 +3242,7 @@ InModuleScope $script:subModuleName {
                 $password = ConvertTo-SecureString -String $mockPasswordPlain -AsPlainText -Force
                 $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $mockUsername, $password
 
-                Mock -CommandName Import-SQLPSModule -MockWith {}
+                Mock -CommandName Import-SQLPSModule
                 Mock -CommandName Invoke-Sqlcmd -ParameterFilter {
                     $Username -eq $mockUsername -and $Password -eq $mockPasswordPlain
                 }
@@ -3068,19 +3268,21 @@ InModuleScope $script:subModuleName {
         }
 
         Context 'Invoke-SqlScript fails to execute the SQL scripts' {
-            $errorMessage = 'Failed to run SQL Script'
+            BeforeEach {
+                $errorMessage = 'Failed to run SQL Script'
 
-            Mock -CommandName Import-SQLPSModule -MockWith {}
-            Mock -CommandName Invoke-Sqlcmd -MockWith {
-                throw $errorMessage
+                Mock -CommandName Import-SQLPSModule
+                Mock -CommandName Invoke-Sqlcmd -MockWith {
+                    throw $errorMessage
+                }
             }
 
             It 'Should throw the correct error from File ParameterSet Invoke-Sqlcmd' {
-                { Invoke-SqlScript @invokeScriptFileParameters } | Should Throw $errorMessage
+                { Invoke-SqlScript @invokeScriptFileParameters } | Should -Throw $errorMessage
             }
 
             It 'Should throw the correct error from Query ParameterSet Invoke-Sqlcmd' {
-                { Invoke-SqlScript @invokeScriptQueryParameters } | Should Throw $errorMessage
+                { Invoke-SqlScript @invokeScriptQueryParameters } | Should -Throw $errorMessage
             }
         }
     }
@@ -3130,9 +3332,9 @@ InModuleScope $script:subModuleName {
         }
     }
 
-    Describe 'SqlServerDsc.Common\Find-ExceptionByNumber'{
+    Describe 'SqlServerDsc.Common\Find-ExceptionByNumber' -Tag 'FindExceptionByNumber' {
         BeforeAll {
-            $mockInnerException = New-Object System.Exception "This is a mock inner excpetion object"
+            $mockInnerException = New-Object System.Exception "This is a mock inner exception object"
             $mockInnerException | Add-Member -Name 'Number' -Value 2 -MemberType NoteProperty
 
             $mockException = New-Object System.Exception "This is a mock exception object", $mockInnerException
@@ -3154,207 +3356,114 @@ InModuleScope $script:subModuleName {
         }
     }
 
-    Describe 'DscResource.LocalizationHelper\Get-LocalizedData' {
-        $mockTestPath = {
-            return $mockTestPathReturnValue
-        }
-
-        $mockImportLocalizedData = {
-            $BaseDirectory | Should -Be $mockExpectedLanguagePath
-        }
-
-        BeforeEach {
-            Mock -CommandName Test-Path -MockWith $mockTestPath -Verifiable
-            Mock -CommandName Import-LocalizedData -MockWith $mockImportLocalizedData -Verifiable
-        }
-
-        Context 'When loading localized data for Swedish' {
-            $mockExpectedLanguagePath = 'sv-SE'
-            $mockTestPathReturnValue = $true
-
-            It 'Should call Import-LocalizedData with sv-SE language' {
-                Mock -CommandName Join-Path -MockWith {
-                    return 'sv-SE'
-                } -Verifiable
-
-                { Get-LocalizedData -ResourceName 'DummyResource' } | Should -Not -Throw
-
-                Assert-MockCalled -CommandName Join-Path -Exactly -Times 3 -Scope It
-                Assert-MockCalled -CommandName Test-Path -Exactly -Times 1 -Scope It
-                Assert-MockCalled -CommandName Import-LocalizedData -Exactly -Times 1 -Scope It
+    Describe 'SqlServerDsc.Common\Get-ProtocolNameProperties' -Tag 'GetProtocolNameProperties' {
+        It "Should return the correct values when the protocol is '<DisplayName>'" -TestCases @(
+            @{
+                ParameterValue = 'TcpIp'
+                DisplayName    = 'TCP/IP'
+                Name           = 'Tcp'
             }
-
-            $mockExpectedLanguagePath = 'en-US'
-            $mockTestPathReturnValue = $false
-
-            It 'Should call Import-LocalizedData and fallback to en-US if sv-SE language does not exist' {
-                Mock -CommandName Join-Path -MockWith {
-                    return $ChildPath
-                } -Verifiable
-
-                { Get-LocalizedData -ResourceName 'DummyResource' } | Should -Not -Throw
-
-                Assert-MockCalled -CommandName Join-Path -Exactly -Times 4 -Scope It
-                Assert-MockCalled -CommandName Test-Path -Exactly -Times 1 -Scope It
-                Assert-MockCalled -CommandName Import-LocalizedData -Exactly -Times 1 -Scope It
+            @{
+                ParameterValue = 'NamedPipes'
+                DisplayName    = 'Named Pipes'
+                Name           = 'Np'
             }
+            @{
+                ParameterValue = 'SharedMemory'
+                DisplayName    = 'Shared Memory'
+                Name           = 'Sm'
+            }
+        ) {
+            param
+            (
+                [System.String]
+                $ParameterValue,
 
-            Context 'When $ScriptRoot is set to a path' {
-                $mockExpectedLanguagePath = 'sv-SE'
-                $mockTestPathReturnValue = $true
+                [System.String]
+                $DisplayName,
 
-                It 'Should call Import-LocalizedData with sv-SE language' {
-                    Mock -CommandName Join-Path -MockWith {
-                        return 'sv-SE'
-                    } -Verifiable
+                [System.String]
+                $Name
+            )
 
-                    { Get-LocalizedData -ResourceName 'DummyResource' -ScriptRoot '.' } | Should -Not -Throw
+            $result = Get-ProtocolNameProperties -ProtocolName $ParameterValue
 
-                    Assert-MockCalled -CommandName Join-Path -Exactly -Times 1 -Scope It
-                    Assert-MockCalled -CommandName Test-Path -Exactly -Times 1 -Scope It
-                    Assert-MockCalled -CommandName Import-LocalizedData -Exactly -Times 1 -Scope It
-                }
+            $result.DisplayName | Should -Be $DisplayName
+            $result.Name | Should -Be  $Name
+        }
+    }
 
-                $mockExpectedLanguagePath = 'en-US'
-                $mockTestPathReturnValue = $false
+    Describe 'SqlServerDsc.Common\Get-ServerProtocolObject' -Tag 'GetServerProtocolObject' {
+        BeforeAll {
+            $mockInstanceName = 'TestInstance'
 
-                It 'Should call Import-LocalizedData and fallback to en-US if sv-SE language does not exist' {
-                    Mock -CommandName Join-Path -MockWith {
-                        return $ChildPath
-                    } -Verifiable
-
-                    { Get-LocalizedData -ResourceName 'DummyResource' -ScriptRoot '.' } | Should -Not -Throw
-
-                    Assert-MockCalled -CommandName Join-Path -Exactly -Times 2 -Scope It
-                    Assert-MockCalled -CommandName Test-Path -Exactly -Times 1 -Scope It
-                    Assert-MockCalled -CommandName Import-LocalizedData -Exactly -Times 1 -Scope It
+            Mock -CommandName New-Object -MockWith {
+                return @{
+                    ServerInstances = @{
+                        $mockInstanceName = @{
+                            ServerProtocols = @{
+                                Tcp = @{
+                                    IsEnabled           = $true
+                                    HasMultiIPAddresses = $true
+                                    ProtocolProperties  = @{
+                                        ListenOnAllIPs = $true
+                                        KeepAlive      = 30000
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        Context 'When loading localized data for English' {
-            Mock -CommandName Join-Path -MockWith {
-                return 'en-US'
-            } -Verifiable
-
-            $mockExpectedLanguagePath = 'en-US'
-            $mockTestPathReturnValue = $true
-
-            It 'Should call Import-LocalizedData with en-US language' {
-                { Get-LocalizedData -ResourceName 'DummyResource' } | Should -Not -Throw
+        It 'Should return a ManagedComputer object with the correct values' {
+            $mockGetServerProtocolObjectParameters = @{
+                ServerName   = 'AnyServer'
+                Instance     = $mockInstanceName
+                ProtocolName = 'TcpIp'
             }
-        }
 
-        Assert-VerifiableMock
+            $result = Get-ServerProtocolObject @mockGetServerProtocolObjectParameters
+
+            $result.IsEnabled | Should -BeTrue
+            $result.HasMultiIPAddresses | Should -BeTrue
+            $result.ProtocolProperties.ListenOnAllIPs | Should -BeTrue
+            $result.ProtocolProperties.KeepAlive | Should -Be 30000
+        }
     }
 
-    Describe 'DscResource.LocalizationHelper\New-InvalidResultException' {
-        Context 'When calling with Message parameter only' {
-            It 'Should throw the correct error' {
-                $mockErrorMessage = 'Mocked error'
+    Describe 'SqlServerDsc.Common\ConvertTo-ServerInstanceName' {
+        It 'Should return correct service instance for a default instance' {
+            $result = ConvertTo-ServerInstanceName -InstanceName 'MSSQLSERVER' -ServerName $env:COMPUTERNAME
 
-                { New-InvalidResultException -Message $mockErrorMessage } | Should -Throw $mockErrorMessage
-            }
+            $result | Should -BeExactly $env:COMPUTERNAME
         }
 
-        Context 'When calling with both the Message and ErrorRecord parameter' {
-            It 'Should throw the correct error' {
-                $mockErrorMessage = 'Mocked error'
-                $mockExceptionErrorMessage = 'Mocked exception error message'
+        It 'Should return correct service instance for a name instance' {
+            $result = ConvertTo-ServerInstanceName -InstanceName 'MyInstance' -ServerName $env:COMPUTERNAME
 
-                $mockException = New-Object -TypeName System.Exception -ArgumentList $mockExceptionErrorMessage
-                $mockErrorRecord = New-Object -TypeName System.Management.Automation.ErrorRecord -ArgumentList $mockException, $null, 'InvalidResult', $null
-
-                { New-InvalidResultException -Message $mockErrorMessage -ErrorRecord $mockErrorRecord } | Should -Throw ('System.Exception: {0} ---> System.Exception: {1}' -f $mockErrorMessage, $mockExceptionErrorMessage)
-            }
+            $result | Should -BeExactly ('{0}\{1}' -f $env:COMPUTERNAME, 'MyInstance')
         }
-
-        Assert-VerifiableMock
     }
 
-    Describe 'DscResource.LocalizationHelper\New-ObjectNotFoundException' {
-        Context 'When calling with Message parameter only' {
-            It 'Should throw the correct error' {
-                $mockErrorMessage = 'Mocked error'
-
-                { New-ObjectNotFoundException -Message $mockErrorMessage } | Should -Throw $mockErrorMessage
+    Describe 'SqlServerDsc.Common\Get-FilePathMajorVersion' {
+        BeforeAll {
+            $mockGetItem_SqlMajorVersion = {
+                return New-Object -TypeName Object |
+                            Add-Member -MemberType ScriptProperty -Name VersionInfo -Value {
+                                return New-Object -TypeName Object |
+                                            Add-Member -MemberType NoteProperty -Name 'ProductVersion' -Value '10.0.0000.00000' -PassThru -Force
+                            } -PassThru -Force
             }
+
+            Mock -CommandName Get-Item -MockWith $mockGetItem_SqlMajorVersion
         }
 
-        Context 'When calling with both the Message and ErrorRecord parameter' {
-            It 'Should throw the correct error' {
-                $mockErrorMessage = 'Mocked error'
-                $mockExceptionErrorMessage = 'Mocked exception error message'
+        It 'Should return correct version' {
+            $result = Get-FilePathMajorVersion -Path 'C:\AnyPath\Setup.exe'
 
-                $mockException = New-Object -TypeName System.Exception -ArgumentList $mockExceptionErrorMessage
-                $mockErrorRecord = New-Object -TypeName System.Management.Automation.ErrorRecord -ArgumentList $mockException, $null, 'InvalidResult', $null
-
-                { New-ObjectNotFoundException -Message $mockErrorMessage -ErrorRecord $mockErrorRecord } | Should -Throw ('System.Exception: {0} ---> System.Exception: {1}' -f $mockErrorMessage, $mockExceptionErrorMessage)
-            }
+            $result | Should -Be '10'
         }
-
-        Assert-VerifiableMock
-    }
-
-    Describe 'DscResource.LocalizationHelper\New-InvalidOperationException' {
-        Context 'When calling with Message parameter only' {
-            It 'Should throw the correct error' {
-                $mockErrorMessage = 'Mocked error'
-
-                { New-InvalidOperationException -Message $mockErrorMessage } | Should -Throw $mockErrorMessage
-            }
-        }
-
-        Context 'When calling with both the Message and ErrorRecord parameter' {
-            It 'Should throw the correct error' {
-                $mockErrorMessage = 'Mocked error'
-                $mockExceptionErrorMessage = 'Mocked exception error message'
-
-                $mockException = New-Object -TypeName System.Exception -ArgumentList $mockExceptionErrorMessage
-                $mockErrorRecord = New-Object -TypeName System.Management.Automation.ErrorRecord -ArgumentList $mockException, $null, 'InvalidResult', $null
-
-                { New-InvalidOperationException -Message $mockErrorMessage -ErrorRecord $mockErrorRecord } | Should -Throw ('System.InvalidOperationException: {0} ---> System.Exception: {1}' -f $mockErrorMessage, $mockExceptionErrorMessage)
-            }
-        }
-
-        Assert-VerifiableMock
-    }
-
-    Describe 'DscResource.LocalizationHelper\New-NotImplementedException' {
-        Context 'When calling with Message parameter only' {
-            It 'Should throw the correct error' {
-                $mockErrorMessage = 'Mocked error'
-
-                { New-NotImplementedException -Message $mockErrorMessage } | Should -Throw $mockErrorMessage
-            }
-        }
-
-        Context 'When calling with both the Message and ErrorRecord parameter' {
-            It 'Should throw the correct error' {
-                $mockErrorMessage = 'Mocked error'
-                $mockExceptionErrorMessage = 'Mocked exception error message'
-
-                $mockException = New-Object -TypeName System.Exception -ArgumentList $mockExceptionErrorMessage
-                $mockErrorRecord = New-Object -TypeName System.Management.Automation.ErrorRecord -ArgumentList $mockException, $null, 'InvalidResult', $null
-
-                { New-NotImplementedException -Message $mockErrorMessage -ErrorRecord $mockErrorRecord } | Should -Throw ('System.NotImplementedException: {0} ---> System.Exception: {1}' -f $mockErrorMessage, $mockExceptionErrorMessage)
-            }
-        }
-
-        Assert-VerifiableMock
-    }
-
-    Describe 'DscResource.LocalizationHelper\New-InvalidArgumentException' {
-        Context 'When calling with both the Message and ArgumentName parameter' {
-            It 'Should throw the correct error' {
-                $mockErrorMessage = 'Mocked error'
-                $mockArgumentName = 'MockArgument'
-
-                { New-InvalidArgumentException -Message $mockErrorMessage -ArgumentName $mockArgumentName } | Should -Throw ('Parameter name: {0}' -f $mockArgumentName)
-            }
-        }
-
-        Assert-VerifiableMock
     }
 }
-

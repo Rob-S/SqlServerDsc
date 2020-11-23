@@ -1,16 +1,25 @@
-$script:resourceModulePath = Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent
-$script:modulesFolderPath = Join-Path -Path $script:resourceModulePath -ChildPath 'Modules'
+<#
+    DEPRECATION NOTICE:
 
-$script:resourceHelperModulePath = Join-Path -Path $script:modulesFolderPath -ChildPath 'SqlServerDsc.Common'
-Import-Module -Name (Join-Path -Path $script:resourceHelperModulePath -ChildPath 'SqlServerDsc.Common.psm1')
+    THIS RESOURCE IS DEPRECATED!
 
-$script:localizedData = Get-LocalizedData -ResourceName 'MSFT_SqlDatabaseOwner'
+    Changes to this resource will no longer be merged. Instead please use the
+    resource SqlDatabase.
+#>
+
+$script:sqlServerDscHelperModulePath = Join-Path -Path $PSScriptRoot -ChildPath '..\..\Modules\SqlServerDsc.Common'
+$script:resourceHelperModulePath = Join-Path -Path $PSScriptRoot -ChildPath '..\..\Modules\DscResource.Common'
+
+Import-Module -Name $script:sqlServerDscHelperModulePath
+Import-Module -Name $script:resourceHelperModulePath
+
+$script:localizedData = Get-LocalizedData -DefaultUICulture 'en-US'
 
 <#
     .SYNOPSIS
     This function gets the owner of the desired sql database.
 
-    .PARAMETER Database
+    .PARAMETER DatabaseName
     The name of database to be configured.
 
     .PARAMETER Name
@@ -31,7 +40,7 @@ function Get-TargetResource
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $Database,
+        $DatabaseName,
 
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
@@ -50,7 +59,7 @@ function Get-TargetResource
     )
 
     Write-Verbose -Message (
-        $script:localizedData.GetCurrentDatabaseOwner -f $Database, $InstanceName
+        $script:localizedData.GetCurrentDatabaseOwner -f $DatabaseName, $InstanceName
     )
 
     try
@@ -59,27 +68,27 @@ function Get-TargetResource
         if ($sqlServerObject)
         {
             # Check database exists
-            if ( -not ($sqlDatabaseObject = $sqlServerObject.Databases[$Database]) )
+            if ( -not ($sqlDatabaseObject = $sqlServerObject.Databases[$DatabaseName]) )
             {
-                $errorMessage = $script:localizedData.DatabaseNotFound -f $Database
+                $errorMessage = $script:localizedData.DatabaseNotFound -f $DatabaseName
                 New-ObjectNotFoundException -Message $errorMessage
             }
 
             $sqlDatabaseOwner = $sqlDatabaseObject.Owner
 
             Write-Verbose -Message (
-                $script:localizedData.CurrentDatabaseOwner -f $Database, $sqlDatabaseOwner
+                $script:localizedData.CurrentDatabaseOwner -f $DatabaseName, $sqlDatabaseOwner
             )
         }
     }
     catch
     {
-        $errorMessage = $script:localizedData.FailedToGetOwnerDatabase -f $Database
+        $errorMessage = $script:localizedData.FailedToGetOwnerDatabase -f $DatabaseName
         New-InvalidOperationException -Message $errorMessage -ErrorRecord $_
     }
 
     $returnValue = @{
-        Database     = $Database
+        DatabaseName = $DatabaseName
         Name         = $sqlDatabaseOwner
         ServerName   = $ServerName
         InstanceName = $InstanceName
@@ -92,7 +101,7 @@ function Get-TargetResource
     .SYNOPSIS
     This function sets the owner of the desired sql database.
 
-    .PARAMETER Database
+    .PARAMETER DatabaseName
     The name of database to be configured.
 
     .PARAMETER Name
@@ -112,7 +121,7 @@ function Set-TargetResource
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $Database,
+        $DatabaseName,
 
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
@@ -134,9 +143,9 @@ function Set-TargetResource
     if ($sqlServerObject)
     {
         # Check database exists
-        if ( -not ($sqlDatabaseObject = $sqlServerObject.Databases[$Database]) )
+        if ( -not ($sqlDatabaseObject = $sqlServerObject.Databases[$DatabaseName]) )
         {
-            $errorMessage = $script:localizedData.DatabaseNotFound -f $Database
+            $errorMessage = $script:localizedData.DatabaseNotFound -f $DatabaseName
             New-ObjectNotFoundException -Message $errorMessage
         }
 
@@ -148,7 +157,7 @@ function Set-TargetResource
         }
 
         Write-Verbose -Message (
-            $script:localizedData.SetDatabaseOwner -f $Database, $InstanceName
+            $script:localizedData.SetDatabaseOwner -f $DatabaseName, $InstanceName
         )
 
         try
@@ -161,7 +170,7 @@ function Set-TargetResource
         }
         catch
         {
-            $errorMessage = $script:localizedData.FailedToSetOwnerDatabase -f $Database
+            $errorMessage = $script:localizedData.FailedToSetOwnerDatabase -f $DatabaseName
             New-InvalidOperationException -Message $errorMessage -ErrorRecord $_
         }
     }
@@ -171,7 +180,7 @@ function Set-TargetResource
     .SYNOPSIS
     This function tests the owner of the desired sql database.
 
-    .PARAMETER Database
+    .PARAMETER DatabaseName
     The name of database to be configured.
 
     .PARAMETER Name
@@ -192,7 +201,7 @@ function Test-TargetResource
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $Database,
+        $DatabaseName,
 
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
@@ -211,13 +220,14 @@ function Test-TargetResource
     )
 
     Write-Verbose -Message (
-        $script:localizedData.TestingConfiguration -f $Database, $InstanceName
+        $script:localizedData.TestingConfiguration -f $DatabaseName, $InstanceName
     )
 
     $currentValues = Get-TargetResource @PSBoundParameters
     return Test-DscParameterState -CurrentValues $CurrentValues `
         -DesiredValues $PSBoundParameters `
-        -ValuesToCheck @('Name', 'Database')
+        -ValuesToCheck @('Name', 'DatabaseName') `
+        -TurnOffTypeChecking
 }
 
 Export-ModuleMember -Function *-TargetResource
