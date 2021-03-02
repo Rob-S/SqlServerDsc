@@ -1,6 +1,6 @@
 Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath '..\TestHelpers\CommonTestHelper.psm1')
 
-if (-not (Test-BuildCategory -Type 'Integration' -Category @('Integration_SQL2016','Integration_SQL2017')))
+if (-not (Test-BuildCategory -Type 'Integration' -Category @('Integration_SQL2016','Integration_SQL2017','Integration_SQL2019')))
 {
     return
 }
@@ -66,7 +66,12 @@ function Show-SqlBootstrapLog
     to run the correct tests depending of what version of SQL Server is
     being tested in the current job.
 #>
-if (Test-ContinuousIntegrationTaskCategory -Category 'Integration_SQL2017')
+if (Test-ContinuousIntegrationTaskCategory -Category 'Integration_SQL2019')
+{
+    $script:sqlVersion = '150'
+    $script:mockSourceDownloadExeUrl = 'https://download.microsoft.com/download/d/a/2/da259851-b941-459d-989c-54a18a5d44dd/SQL2019-SSEI-Dev.exe'
+}
+elseif (Test-ContinuousIntegrationTaskCategory -Category 'Integration_SQL2017')
 {
     $script:sqlVersion = '140'
     $script:mockSourceMediaUrl = 'https://download.microsoft.com/download/E/F/2/EF23C21D-7860-4F05-88CE-39AA114B014B/SQLServer2017-x64-ENU.iso'
@@ -93,7 +98,28 @@ try
 
         Write-Verbose -Message "Start downloading the SQL Server media at $(Get-Date -Format 'yyyy-MM-dd hh:mm:ss')" -Verbose
 
-        Invoke-WebRequest -Uri $script:mockSourceMediaUrl -OutFile $ConfigurationData.AllNodes.ImagePath
+        if ($script:mockSourceDownloadExeUrl)
+        {
+            # Download the EXE used to download the ISO
+            Invoke-WebRequest -Uri $script:mockSourceDownloadExeUrl -OutFile $ConfigurationData.AllNodes.DownloadExePath | Out-Null
+
+            # Download ISO using the EXE
+            $imageDirectoryPath = Split-Path -Path $ConfigurationData.AllNodes.ImagePath -Parent
+            $downloadExeArgumentList = '/ENU /Quiet /HideProgressBar /Action=Download /Language=en-US /MediaType=ISO /MediaPath={0}' -f $imageDirectoryPath
+            Start-Process -FilePath $ConfigurationData.AllNodes.DownloadExePath `
+                          -ArgumentList $downloadExeArgumentList `
+                          -Wait
+
+            # Rename the ISO to maintain consistency of names within integration tests
+            Rename-Item -Path $ConfigurationData.AllNodes.DownloadIsoPath `
+                        -NewName $(Split-Path -Path $ConfigurationData.AllNodes.ImagePath -Leaf) | Out-Null
+
+        }
+        else
+        {
+            # Direct ISO download
+            Invoke-WebRequest -Uri $script:mockSourceMediaUrl -OutFile $ConfigurationData.AllNodes.ImagePath
+        }
 
         Write-Verbose -Message ('SQL Server media file has SHA1 hash ''{0}''' -f (Get-FileHash -Path $ConfigurationData.AllNodes.ImagePath -Algorithm 'SHA1').Hash) -Verbose
 
@@ -147,6 +173,39 @@ try
             }
         }
 
+
+        $configurationName = "$($script:dscResourceName)_InstallSqlServerModule_Config"
+
+        Context ('When using configuration {0}' -f $configurationName) {
+            It 'Should compile and apply the MOF without throwing' {
+                {
+                    $configurationParameters = @{
+                        OutputPath        = $TestDrive
+                        # The variable $ConfigurationData was dot-sourced above.
+                        ConfigurationData = $ConfigurationData
+                    }
+
+                    & $configurationName @configurationParameters
+
+                    $startDscConfigurationParameters = @{
+                        Path         = $TestDrive
+                        ComputerName = 'localhost'
+                        Wait         = $true
+                        Verbose      = $true
+                        Force        = $true
+                        ErrorAction  = 'Stop'
+                    }
+
+                    Start-DscConfiguration @startDscConfigurationParameters
+                } | Should -Not -Throw
+            }
+
+            # Make sure the module was installed.
+            It 'Should return $true when Test-DscConfiguration is run' {
+                Test-DscConfiguration -Verbose | Should -Be 'True'
+            }
+        }
+
         $configurationName = "$($script:dscResourceName)_InstallDatabaseEngineNamedInstanceAsSystem_Config"
 
         Context ('When using configuration {0}' -f $configurationName) {
@@ -195,20 +254,16 @@ try
                 $resourceCurrentState.AgtSvcAccount              | Should -BeNullOrEmpty
                 $resourceCurrentState.AgtSvcAccountUsername      | Should -Be ('.\{0}' -f (Split-Path -Path $ConfigurationData.AllNodes.SqlAgentServicePrimaryAccountUserName -Leaf))
                 $resourceCurrentState.AgtSvcStartupType          | Should -Be 'Automatic'
-                $resourceCurrentState.ASServerMode               | Should -Be $ConfigurationData.AllNodes.AnalysisServicesMultiServerMode
-                $resourceCurrentState.ASBackupDir                | Should -Be (Join-Path -Path $ConfigurationData.AllNodes.InstallSharedDir -ChildPath "$($ConfigurationData.AllNodes.AnalysisServiceInstanceIdPrefix).$($ConfigurationData.AllNodes.DatabaseEngineNamedInstanceName)\OLAP\Backup")
-                $resourceCurrentState.ASCollation                | Should -Be $ConfigurationData.AllNodes.Collation
-                $resourceCurrentState.ASConfigDir                | Should -Be (Join-Path -Path $ConfigurationData.AllNodes.InstallSharedDir -ChildPath "$($ConfigurationData.AllNodes.AnalysisServiceInstanceIdPrefix).$($ConfigurationData.AllNodes.DatabaseEngineNamedInstanceName)\OLAP\Config")
-                $resourceCurrentState.ASDataDir                  | Should -Be (Join-Path -Path $ConfigurationData.AllNodes.InstallSharedDir -ChildPath "$($ConfigurationData.AllNodes.AnalysisServiceInstanceIdPrefix).$($ConfigurationData.AllNodes.DatabaseEngineNamedInstanceName)\OLAP\Data")
-                $resourceCurrentState.ASLogDir                   | Should -Be (Join-Path -Path $ConfigurationData.AllNodes.InstallSharedDir -ChildPath "$($ConfigurationData.AllNodes.AnalysisServiceInstanceIdPrefix).$($ConfigurationData.AllNodes.DatabaseEngineNamedInstanceName)\OLAP\Log")
-                $resourceCurrentState.ASTempDir                  | Should -Be (Join-Path -Path $ConfigurationData.AllNodes.InstallSharedDir -ChildPath "$($ConfigurationData.AllNodes.AnalysisServiceInstanceIdPrefix).$($ConfigurationData.AllNodes.DatabaseEngineNamedInstanceName)\OLAP\Temp")
+                $resourceCurrentState.ASServerMode               | Should -BeNullOrEmpty
+                $resourceCurrentState.ASBackupDir                | Should -BeNullOrEmpty
+                $resourceCurrentState.ASCollation                | Should -BeNullOrEmpty
+                $resourceCurrentState.ASConfigDir                | Should -BeNullOrEmpty
+                $resourceCurrentState.ASDataDir                  | Should -BeNullOrEmpty
+                $resourceCurrentState.ASLogDir                   | Should -BeNullOrEmpty
+                $resourceCurrentState.ASTempDir                  | Should -BeNullOrEmpty
                 $resourceCurrentState.ASSvcAccount               | Should -BeNullOrEmpty
-                $resourceCurrentState.ASSvcAccountUsername       | Should -Be ('.\{0}' -f (Split-Path -Path $ConfigurationData.AllNodes.SqlServicePrimaryAccountUserName -Leaf))
-                $resourceCurrentState.AsSvcStartupType           | Should -Be 'Automatic'
-                $resourceCurrentState.ASSysAdminAccounts         | Should -Be @(
-                    $ConfigurationData.AllNodes.SqlAdministratorAccountUserName,
-                    "NT SERVICE\SSASTELEMETRY`$$($ConfigurationData.AllNodes.DatabaseEngineNamedInstanceName)"
-                )
+                $resourceCurrentState.ASSvcAccountUsername       | Should -BeNullOrEmpty
+                $resourceCurrentState.ASSysAdminAccounts         | Should -BeNullOrEmpty
                 $resourceCurrentState.BrowserSvcStartupType      | Should -BeNullOrEmpty
                 $resourceCurrentState.ErrorReporting             | Should -BeNullOrEmpty
                 $resourceCurrentState.FailoverClusterGroupName   | Should -BeNullOrEmpty
@@ -410,6 +465,138 @@ try
         }
 
         $configurationName = "$($script:dscResourceName)_StopSqlServerDefaultInstance_Config"
+
+        Context ('When using configuration {0}' -f $configurationName) {
+            It 'Should compile and apply the MOF without throwing' {
+                {
+                    $configurationParameters = @{
+                        OutputPath        = $TestDrive
+                        # The variable $ConfigurationData was dot-sourced above.
+                        ConfigurationData = $ConfigurationData
+                    }
+
+                    & $configurationName @configurationParameters
+
+                    $startDscConfigurationParameters = @{
+                        Path         = $TestDrive
+                        ComputerName = 'localhost'
+                        Wait         = $true
+                        Verbose      = $true
+                        Force        = $true
+                        ErrorAction  = 'Stop'
+                    }
+
+                    Start-DscConfiguration @startDscConfigurationParameters
+                } | Should -Not -Throw
+            }
+        }
+
+        $configurationName = "$($script:dscResourceName)_InstallMultiDimensionalAnalysisServicesAsSystem_Config"
+
+        Context ('When using configuration {0}' -f $configurationName) {
+            It 'Should compile and apply the MOF without throwing' {
+                {
+                    $configurationParameters = @{
+                        OutputPath                  = $TestDrive
+                        # The variable $ConfigurationData was dot-sourced above.
+                        ConfigurationData           = $ConfigurationData
+                    }
+
+                    & $configurationName @configurationParameters
+
+                    $startDscConfigurationParameters = @{
+                        Path         = $TestDrive
+                        ComputerName = 'localhost'
+                        Wait         = $true
+                        Verbose      = $true
+                        Force        = $true
+                        ErrorAction  = 'Stop'
+                    }
+
+                    Start-DscConfiguration @startDscConfigurationParameters
+                } | Should -Not -Throw
+            } -ErrorVariable itBlockError
+
+            # Check if previous It-block failed. If so output the SQL Server setup log file.
+            if ( $itBlockError.Count -ne 0 )
+            {
+                Show-SqlBootstrapLog
+            }
+
+            It 'Should be able to call Get-DscConfiguration without throwing' {
+                {
+                    $script:currentConfiguration = Get-DscConfiguration -Verbose -ErrorAction Stop
+                } | Should -Not -Throw
+            }
+
+            It 'Should have set the resource and all the parameters should match' {
+                $resourceCurrentState = $script:currentConfiguration | Where-Object -FilterScript {
+                    $_.ConfigurationName -eq $configurationName `
+                    -and $_.ResourceId -eq $resourceId
+                }
+
+                $resourceCurrentState.Action                     | Should -Be 'Install'
+                $resourceCurrentState.AgtSvcAccount              | Should -BeNullOrEmpty
+                $resourceCurrentState.AgtSvcAccountUsername      | Should -BeNullOrEmpty
+                $resourceCurrentState.ASServerMode               | Should -Be $ConfigurationData.AllNodes.AnalysisServicesMultiServerMode
+                $resourceCurrentState.ASBackupDir                | Should -Be (Join-Path -Path $ConfigurationData.AllNodes.InstallSharedDir -ChildPath "$($ConfigurationData.AllNodes.AnalysisServiceInstanceIdPrefix).$($ConfigurationData.AllNodes.AnalysisServicesMultiInstanceName)\OLAP\Backup")
+                $resourceCurrentState.ASCollation                | Should -Be $ConfigurationData.AllNodes.Collation
+                $resourceCurrentState.ASConfigDir                | Should -Be (Join-Path -Path $ConfigurationData.AllNodes.InstallSharedDir -ChildPath "$($ConfigurationData.AllNodes.AnalysisServiceInstanceIdPrefix).$($ConfigurationData.AllNodes.AnalysisServicesMultiInstanceName)\OLAP\Config")
+                $resourceCurrentState.ASDataDir                  | Should -Be (Join-Path -Path $ConfigurationData.AllNodes.InstallSharedDir -ChildPath "$($ConfigurationData.AllNodes.AnalysisServiceInstanceIdPrefix).$($ConfigurationData.AllNodes.AnalysisServicesMultiInstanceName)\OLAP\Data")
+                $resourceCurrentState.ASLogDir                   | Should -Be (Join-Path -Path $ConfigurationData.AllNodes.InstallSharedDir -ChildPath "$($ConfigurationData.AllNodes.AnalysisServiceInstanceIdPrefix).$($ConfigurationData.AllNodes.AnalysisServicesMultiInstanceName)\OLAP\Log")
+                $resourceCurrentState.ASTempDir                  | Should -Be (Join-Path -Path $ConfigurationData.AllNodes.InstallSharedDir -ChildPath "$($ConfigurationData.AllNodes.AnalysisServiceInstanceIdPrefix).$($ConfigurationData.AllNodes.AnalysisServicesMultiInstanceName)\OLAP\Temp")
+                $resourceCurrentState.ASSvcAccount               | Should -BeNullOrEmpty
+                $resourceCurrentState.ASSvcAccountUsername       | Should -Be ('.\{0}' -f (Split-Path -Path $ConfigurationData.AllNodes.SqlServicePrimaryAccountUserName -Leaf))
+                $resourceCurrentState.ASSysAdminAccounts         | Should -Be @(
+                    $ConfigurationData.AllNodes.SqlAdministratorAccountUserName,
+                    "NT SERVICE\SSASTELEMETRY`$$($ConfigurationData.AllNodes.AnalysisServicesMultiInstanceName)"
+                )
+                $resourceCurrentState.BrowserSvcStartupType      | Should -BeNullOrEmpty
+                $resourceCurrentState.ErrorReporting             | Should -BeNullOrEmpty
+                $resourceCurrentState.FailoverClusterGroupName   | Should -BeNullOrEmpty
+                $resourceCurrentState.FailoverClusterIPAddress   | Should -BeNullOrEmpty
+                $resourceCurrentState.FailoverClusterNetworkName | Should -BeNullOrEmpty
+                $resourceCurrentState.Features                   | Should -Be $ConfigurationData.AllNodes.AnalysisServicesMultiFeatures
+                $resourceCurrentState.ForceReboot                | Should -BeNullOrEmpty
+                $resourceCurrentState.FTSvcAccount               | Should -BeNullOrEmpty
+                $resourceCurrentState.FTSvcAccountUsername       | Should -BeNullOrEmpty
+                $resourceCurrentState.InstallSharedDir           | Should -Be $ConfigurationData.AllNodes.InstallSharedDir
+                $resourceCurrentState.InstallSharedWOWDir        | Should -Be $ConfigurationData.AllNodes.InstallSharedWOWDir
+                $resourceCurrentState.InstallSQLDataDir          | Should -BeNullOrEmpty
+                $resourceCurrentState.InstanceDir                | Should -BeNullOrEmpty
+                $resourceCurrentState.InstanceID                 | Should -BeNullOrEmpty
+                $resourceCurrentState.InstanceName               | Should -Be $ConfigurationData.AllNodes.AnalysisServicesMultiInstanceName
+                $resourceCurrentState.ISSvcAccount               | Should -BeNullOrEmpty
+                $resourceCurrentState.ISSvcAccountUsername       | Should -BeNullOrEmpty
+                $resourceCurrentState.ProductKey                 | Should -BeNullOrEmpty
+                $resourceCurrentState.RSSvcAccount               | Should -BeNullOrEmpty
+                $resourceCurrentState.RSSvcAccountUsername       | Should -BeNullOrEmpty
+                $resourceCurrentState.SAPwd                      | Should -BeNullOrEmpty
+                $resourceCurrentState.SecurityMode               | Should -BeNullOrEmpty
+                $resourceCurrentState.SetupProcessTimeout        | Should -BeNullOrEmpty
+                $resourceCurrentState.SourceCredential           | Should -BeNullOrEmpty
+                $resourceCurrentState.SourcePath                 | Should -Be "$($ConfigurationData.AllNodes.DriveLetter):\"
+                $resourceCurrentState.SQLBackupDir               | Should -BeNullOrEmpty
+                $resourceCurrentState.SQLCollation               | Should -BeNullOrEmpty
+                $resourceCurrentState.SQLSvcAccount              | Should -BeNullOrEmpty
+                $resourceCurrentState.SQLSvcAccountUsername      | Should -BeNullOrEmpty
+                $resourceCurrentState.SQLSysAdminAccounts        | Should -BeNullOrEmpty
+                $resourceCurrentState.SQLTempDBDir               | Should -BeNullOrEmpty
+                $resourceCurrentState.SQLTempDBLogDir            | Should -BeNullOrEmpty
+                $resourceCurrentState.SQLUserDBDir               | Should -BeNullOrEmpty
+                $resourceCurrentState.SQLUserDBLogDir            | Should -BeNullOrEmpty
+                $resourceCurrentState.SQMReporting               | Should -BeNullOrEmpty
+                $resourceCurrentState.SuppressReboot             | Should -BeNullOrEmpty
+                $resourceCurrentState.UpdateEnabled              | Should -BeNullOrEmpty
+                $resourceCurrentState.UpdateSource               | Should -BeNullOrEmpty
+            }
+
+            It 'Should return $true when Test-DscConfiguration is run' {
+                Test-DscConfiguration -Verbose | Should -Be 'True'
+            }
+        }
+
+        $configurationName = "$($script:dscResourceName)_StopMultiDimensionalAnalysisServices_Config"
 
         Context ('When using configuration {0}' -f $configurationName) {
             It 'Should compile and apply the MOF without throwing' {

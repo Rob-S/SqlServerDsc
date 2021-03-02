@@ -15,7 +15,7 @@ $script:localizedData = Get-LocalizedData -DefaultUICulture 'en-US'
 
     .PARAMETER ServerName
         Specifies the host name of the SQL Server on which the instance exist.
-        Default value is $env:COMPUTERNAME.
+        Default value is the current computer name.
 
     .PARAMETER InstanceName
         Specifies the SQL instance in which the database exist.
@@ -36,7 +36,7 @@ function Get-TargetResource
         [Parameter()]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $ServerName = $env:COMPUTERNAME,
+        $ServerName = (Get-ComputerName),
 
         [Parameter(Mandatory = $true)]
         [System.String]
@@ -113,7 +113,7 @@ function Get-TargetResource
 
     .PARAMETER ServerName
         Specifies the host name of the SQL Server on which the instance exist.
-        Default value is $env:COMPUTERNAME.
+        Default value is the current computer name.
 
     .PARAMETER InstanceName
         Specifies the SQL instance in which the database exist.
@@ -145,6 +145,7 @@ function Get-TargetResource
 #>
 function Set-TargetResource
 {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('SqlServerDsc.AnalyzerRules\Measure-CommandsNeededToLoadSMO', '', Justification = 'The command Connect-Sql is called when Get-TargetResource is called')]
     [CmdletBinding()]
     param
     (
@@ -155,7 +156,7 @@ function Set-TargetResource
         [Parameter()]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $ServerName = $env:COMPUTERNAME,
+        $ServerName = (Get-ComputerName),
 
         [Parameter(Mandatory = $true)]
         [System.String]
@@ -242,8 +243,14 @@ function Set-TargetResource
                                 $script:localizedData.ChangingLoginName -f $Name, $LoginName
                             )
 
+                            $assertSqlLoginParameters = @{
+                                ServerName   = $ServerName
+                                InstanceName = $InstanceName
+                                LoginName    = $LoginName
+                            }
+
                             # Assert that the login exist.
-                            Assert-SqlLogin @PSBoundParameters
+                            Assert-SqlLogin @assertSqlLoginParameters
 
                             try
                             {
@@ -310,7 +317,6 @@ function Set-TargetResource
 
                 $recreateDatabaseUser = $true
             }
-
         }
     }
 
@@ -359,8 +365,14 @@ function Set-TargetResource
             {
                 'Login'
                 {
+                    $assertSqlLoginParameters = @{
+                        ServerName   = $ServerName
+                        InstanceName = $InstanceName
+                        LoginName    = $LoginName
+                    }
+
                     # Assert that the login exist.
-                    Assert-SqlLogin @PSBoundParameters
+                    Assert-SqlLogin @assertSqlLoginParameters
 
                     Invoke-Query @invokeQueryParameters -Query (
                         'CREATE USER [{0}] FOR LOGIN [{1}];' -f $Name, $LoginName
@@ -412,7 +424,7 @@ function Set-TargetResource
 
     .PARAMETER ServerName
         Specifies the host name of the SQL Server on which the instance exist.
-        Default value is $env:COMPUTERNAME.
+        Default value is the current computer name.
 
     .PARAMETER InstanceName
         Specifies the SQL instance in which the database exist.
@@ -444,6 +456,7 @@ function Set-TargetResource
 #>
 function Test-TargetResource
 {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('SqlServerDsc.AnalyzerRules\Measure-CommandsNeededToLoadSMO', '', Justification = 'The command Connect-Sql is called when Get-TargetResource is called')]
     [CmdletBinding()]
     [OutputType([System.Boolean])]
     param
@@ -455,7 +468,7 @@ function Test-TargetResource
         [Parameter()]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $ServerName = $env:COMPUTERNAME,
+        $ServerName = (Get-ComputerName),
 
         [Parameter(Mandatory = $true)]
         [System.String]
@@ -600,15 +613,14 @@ function ConvertTo-UserType
                     'NoLogin'
                 }
 
-                Default
+                default
                 {
                     $LoginType
                 }
             }
-
         }
 
-        Default
+        default
         {
             $errorMessage = $script:localizedData.UnknownAuthenticationType -f $AuthenticationType, $LoginType
             New-InvalidOperationException -Message $errorMessage
@@ -735,11 +747,7 @@ function Assert-SqlLogin
 
         [Parameter(Mandatory = $true)]
         [System.String]
-        $LoginName,
-
-        # Catch all other splatted parameters from $PSBoundParameters
-        [Parameter(ValueFromRemainingArguments = $true)]
-        $RemainingArguments
+        $LoginName
     )
 
     $sqlServerObject = Connect-SQL -ServerName $ServerName -InstanceName $InstanceName
@@ -863,4 +871,3 @@ function Assert-DatabaseAsymmetricKey
     }
 }
 
-Export-ModuleMember -Function *-TargetResource

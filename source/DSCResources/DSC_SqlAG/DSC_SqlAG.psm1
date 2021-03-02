@@ -558,6 +558,7 @@ function Set-TargetResource
 #>
 function Test-TargetResource
 {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('SqlServerDsc.AnalyzerRules\Measure-CommandsNeededToLoadSMO', '', Justification='The command Connect-Sql is called when Get-TargetResource is called')]
     [CmdletBinding()]
     [OutputType([System.Boolean])]
     param
@@ -657,7 +658,7 @@ function Test-TargetResource
     if ( $ProcessOnlyOnActiveNode -and -not $getTargetResourceResult.IsActiveNode )
     {
         Write-Verbose -Message (
-            $script:localizedData.NotActiveNode -f $env:COMPUTERNAME, $InstanceName
+            $script:localizedData.NotActiveNode -f (Get-ComputerName), $InstanceName
         )
 
         return $result
@@ -819,4 +820,3 @@ function Update-AvailabilityGroup
     }
 }
 
-Export-ModuleMember -Function *-TargetResource

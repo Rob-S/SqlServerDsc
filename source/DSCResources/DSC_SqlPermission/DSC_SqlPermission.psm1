@@ -35,7 +35,7 @@ function Get-TargetResource
         [Parameter()]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $ServerName = $env:COMPUTERNAME,
+        $ServerName = (Get-ComputerName),
 
         [Parameter(Mandatory = $true)]
         [System.String]
@@ -129,7 +129,7 @@ function Set-TargetResource
         [Parameter()]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $ServerName = $env:COMPUTERNAME,
+        $ServerName = (Get-ComputerName),
 
         [Parameter()]
         [ValidateSet('Present', 'Absent')]
@@ -215,6 +215,7 @@ function Set-TargetResource
 #>
 function Test-TargetResource
 {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('SqlServerDsc.AnalyzerRules\Measure-CommandsNeededToLoadSMO', '', Justification='The command Connect-Sql is called when Get-TargetResource is called')]
     [CmdletBinding()]
     [OutputType([System.Boolean])]
     param
@@ -226,7 +227,7 @@ function Test-TargetResource
         [Parameter()]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $ServerName = $env:COMPUTERNAME,
+        $ServerName = (Get-ComputerName),
 
         [Parameter()]
         [ValidateSet('Present', 'Absent')]
@@ -377,4 +378,3 @@ function Merge-SQLPermissionSet
     return $baseObject
 }
 
-Export-ModuleMember -Function *-TargetResource

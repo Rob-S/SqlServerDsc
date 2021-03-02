@@ -11,7 +11,8 @@ $script:localizedData = Get-LocalizedData -DefaultUICulture 'en-US'
         Gets the service account for the specified instance.
 
     .PARAMETER ServerName
-        Host name of the SQL Server to manage. Default value is $env:COMPUTERNAME.
+        Host name of the SQL Server to manage. Default value is the current
+        computer name.
 
     .PARAMETER InstanceName
         Name of the SQL instance.
@@ -34,6 +35,7 @@ $script:localizedData = Get-LocalizedData -DefaultUICulture 'en-US'
 #>
 function Get-TargetResource
 {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('SqlServerDsc.AnalyzerRules\Measure-CommandsNeededToLoadSMO', '', Justification='The command Import-SQLPSModule is called when Get-ServiceObject is called')]
     [CmdletBinding()]
     [OutputType([System.Collections.Hashtable])]
     param
@@ -41,7 +43,7 @@ function Get-TargetResource
         [Parameter()]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $ServerName = $env:COMPUTERNAME,
+        $ServerName = (Get-ComputerName),
 
         [Parameter(Mandatory = $true)]
         [System.String]
@@ -95,7 +97,8 @@ function Get-TargetResource
         Tests whether the specified instance's service account is correctly configured.
 
     .PARAMETER ServerName
-        Host name of the SQL Server to manage. Default value is $env:COMPUTERNAME.
+        Host name of the SQL Server to manage. Default value is the current
+        computer name.
 
     .PARAMETER InstanceName
         Name of the SQL instance.
@@ -124,6 +127,7 @@ function Get-TargetResource
 #>
 function Test-TargetResource
 {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('SqlServerDsc.AnalyzerRules\Measure-CommandsNeededToLoadSMO', '', Justification='The command Import-SQLPSModule is implicitly called when calling Get-TargetResource')]
     [CmdletBinding()]
     [OutputType([System.Boolean])]
     param
@@ -131,7 +135,7 @@ function Test-TargetResource
         [Parameter()]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $ServerName = $env:COMPUTERNAME,
+        $ServerName = (Get-ComputerName),
 
         [Parameter(Mandatory = $true)]
         [System.String]
@@ -177,7 +181,8 @@ function Test-TargetResource
         Sets the SQL Server service account to the desired state.
 
     .PARAMETER ServerName
-        Host name of the SQL Server to manage. Default value is $env:COMPUTERNAME.
+        Host name of the SQL Server to manage. Default value is the current
+        computer name.
 
     .PARAMETER InstanceName
         Name of the SQL instance.
@@ -204,13 +209,14 @@ function Test-TargetResource
 #>
 function Set-TargetResource
 {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('SqlServerDsc.AnalyzerRules\Measure-CommandsNeededToLoadSMO', '', Justification='The command Import-SQLPSModule is called when Get-ServiceObject is called')]
     [CmdletBinding()]
     param
     (
         [Parameter()]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $ServerName = $env:COMPUTERNAME,
+        $ServerName = (Get-ComputerName),
 
         [Parameter(Mandatory = $true)]
         [System.String]

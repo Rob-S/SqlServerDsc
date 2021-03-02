@@ -21,6 +21,7 @@ $script:localizedData = Get-LocalizedData -DefaultUICulture 'en-US'
 #>
 function Get-TargetResource
 {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('SqlServerDsc.AnalyzerRules\Measure-CommandsNeededToLoadSMO', '', Justification='Neither command is needed for this function since it uses CIM methods when calling Get-ReportingServicesData')]
     [CmdletBinding()]
     [OutputType([System.Collections.Hashtable])]
     param
@@ -258,7 +259,6 @@ function Set-TargetResource
 
             $reportingServicesServiceName = 'SQLServerReportingServices'
             $reportingServicesDatabaseName = 'ReportServer'
-
         }
         elseif ( $InstanceName -eq 'MSSQLSERVER' )
         {
@@ -776,6 +776,7 @@ function Set-TargetResource
 #>
 function Test-TargetResource
 {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('SqlServerDsc.AnalyzerRules\Measure-CommandsNeededToLoadSMO', '', Justification='Neither command is needed for this function since it uses CIM methods implicitly when calling Get-TargetResource')]
     [CmdletBinding()]
     [OutputType([System.Boolean])]
     param
@@ -903,7 +904,7 @@ function Get-ReportingServicesData
 
         if (Test-Path -Path "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\$instanceId\MSSQLServer\CurrentVersion")
         {
-            # SQL Server 2017 SSRS stores current SQL Server version to a different Registry path.
+            # SQL Server 2017 and 2019 SSRS stores current SQL Server version to a different Registry path.
             $sqlVersion = [int]((Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\$InstanceId\MSSQLServer\CurrentVersion" -Name 'CurrentVersion').CurrentVersion).Split('.')[0]
         }
         else
@@ -1012,4 +1013,3 @@ function Invoke-RsCimMethod
     return $invokeCimMethodResult
 }
 
-Export-ModuleMember -Function *-TargetResource

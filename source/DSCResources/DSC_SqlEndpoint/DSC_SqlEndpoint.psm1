@@ -18,7 +18,8 @@ $script:localizedData = Get-LocalizedData -DefaultUICulture 'en-US'
         are Database Mirror and Service Broker.
 
     .PARAMETER ServerName
-        The host name of the SQL Server to be configured. Default value is $env:COMPUTERNAME.
+        The host name of the SQL Server to be configured. Default value is the
+        current computer name.
 
     .PARAMETER InstanceName
         The name of the SQL instance to be configured.
@@ -49,7 +50,7 @@ function Get-TargetResource
         [Parameter()]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $ServerName = $env:COMPUTERNAME,
+        $ServerName = (Get-ComputerName),
 
         [Parameter(Mandatory = $true)]
         [System.String]
@@ -132,7 +133,8 @@ function Get-TargetResource
         default value is only used during endpoint creation, it is not enforced.
 
     .PARAMETER ServerName
-        The host name of the SQL Server to be configured. Default value is $env:COMPUTERNAME.
+        The host name of the SQL Server to be configured. Default value is the
+        current computer name.
 
     .PARAMETER InstanceName
         The name of the SQL instance to be configured.
@@ -185,7 +187,7 @@ function Set-TargetResource
         [Parameter()]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $ServerName = $env:COMPUTERNAME,
+        $ServerName = (Get-ComputerName),
 
         [Parameter(Mandatory = $true)]
         [System.String]
@@ -454,7 +456,8 @@ function Set-TargetResource
         default value is only used during endpoint creation, it is not enforce.
 
     .PARAMETER ServerName
-        The host name of the SQL Server to be configured. Default value is $env:COMPUTERNAME.
+        The host name of the SQL Server to be configured. Default value is the
+        current computer name.
 
     .PARAMETER InstanceName
         The name of the SQL instance to be configured.
@@ -481,6 +484,7 @@ function Set-TargetResource
 #>
 function Test-TargetResource
 {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('SqlServerDsc.AnalyzerRules\Measure-CommandsNeededToLoadSMO', '', Justification='The command Connect-Sql is called when Get-TargetResource is called')]
     [CmdletBinding()]
     [OutputType([System.Boolean])]
     param
@@ -506,7 +510,7 @@ function Test-TargetResource
         [Parameter()]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $ServerName = $env:COMPUTERNAME,
+        $ServerName = (Get-ComputerName),
 
         [Parameter(Mandatory = $true)]
         [System.String]
@@ -567,7 +571,7 @@ function Test-TargetResource
             }
         }
 
-        if ($getTargetResourceResult.EndpointType -in @('DatabaseMirroring','ServiceBroker'))
+        if ($getTargetResourceResult.EndpointType -in @('DatabaseMirroring', 'ServiceBroker'))
         {
             if ($PSBoundParameters.ContainsKey('IsMessageForwardingEnabled'))
             {
@@ -617,4 +621,3 @@ function Test-TargetResource
     return $result
 }
 
-Export-ModuleMember -Function *-TargetResource

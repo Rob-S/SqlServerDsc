@@ -424,7 +424,7 @@ function Start-SqlSetupProcess
 
     .PARAMETER ServerName
         String containing the host name of the SQL Server to connect to.
-        Default value is $env:COMPUTERNAME.
+        Default value is the current computer name.
 
     .PARAMETER InstanceName
         String containing the SQL Server Database Engine instance to connect to.
@@ -471,7 +471,7 @@ function Connect-SQL
         [Parameter(ParameterSetName = 'SqlServerWithCredential')]
         [ValidateNotNull()]
         [System.String]
-        $ServerName = $env:COMPUTERNAME,
+        $ServerName = (Get-ComputerName),
 
         [Parameter(ParameterSetName = 'SqlServer')]
         [Parameter(ParameterSetName = 'SqlServerWithCredential')]
@@ -607,7 +607,7 @@ function Connect-SQLAnalysis
         [Parameter()]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $ServerName = $env:COMPUTERNAME,
+        $ServerName = (Get-ComputerName),
 
         [Parameter()]
         [ValidateNotNullOrEmpty()]
@@ -618,10 +618,12 @@ function Connect-SQLAnalysis
         [ValidateNotNullOrEmpty()]
         [System.Management.Automation.PSCredential]
         [System.Management.Automation.Credential()]
-        $SetupCredential
-    )
+        $SetupCredential,
 
-    $null = Import-Assembly -Name 'Microsoft.AnalysisServices' -LoadWithPartialName
+        [Parameter()]
+        [System.String[]]
+        $FeatureFlag
+    )
 
     if ($InstanceName -eq 'MSSQLSERVER')
     {
@@ -646,20 +648,47 @@ function Connect-SQLAnalysis
 
     try
     {
-        $analysisServicesObject = New-Object -TypeName 'Microsoft.AnalysisServices.Server'
-
-        if ($analysisServicesObject)
+        if ((Test-FeatureFlag -FeatureFlag $FeatureFlag -TestFlag 'AnalysisServicesConnection'))
         {
-            $analysisServicesObject.Connect($analysisServicesDataSource)
+            Import-SQLPSModule
+
+            $analysisServicesObject = New-Object -TypeName 'Microsoft.AnalysisServices.Server'
+
+            if ($analysisServicesObject)
+            {
+                $analysisServicesObject.Connect($analysisServicesDataSource)
+            }
+
+            if ((-not $analysisServicesObject) -or ($analysisServicesObject -and $analysisServicesObject.Connected -eq $false))
+            {
+                $errorMessage = $script:localizedData.FailedToConnectToAnalysisServicesInstance -f $analysisServiceInstance
+
+                New-InvalidOperationException -Message $errorMessage
+            }
+            else
+            {
+                Write-Verbose -Message ($script:localizedData.ConnectedToAnalysisServicesInstance -f $analysisServiceInstance) -Verbose
+            }
         }
         else
         {
-            $errorMessage = $script:localizedData.FailedToConnectToAnalysisServicesInstance -f $analysisServiceInstance
+            $null = Import-Assembly -Name 'Microsoft.AnalysisServices' -LoadWithPartialName
 
-            New-InvalidOperationException -Message $errorMessage
+            $analysisServicesObject = New-Object -TypeName 'Microsoft.AnalysisServices.Server'
+
+            if ($analysisServicesObject)
+            {
+                $analysisServicesObject.Connect($analysisServicesDataSource)
+            }
+            else
+            {
+                $errorMessage = $script:localizedData.FailedToConnectToAnalysisServicesInstance -f $analysisServiceInstance
+
+                New-InvalidOperationException -Message $errorMessage
+            }
+
+            Write-Verbose -Message ($script:localizedData.ConnectedToAnalysisServicesInstance -f $analysisServiceInstance) -Verbose
         }
-
-        Write-Verbose -Message ($script:localizedData.ConnectedToAnalysisServicesInstance -f $analysisServiceInstance) -Verbose
     }
     catch
     {
@@ -1201,7 +1230,7 @@ function Restart-SqlClusterService
                 else
                 {
                     Write-Verbose -Message (
-                        $script:localizedData.NotOwnerOfClusterResource -f $env:COMPUTERNAME, $agentService.Name, $agentService.OwnerNode
+                        $script:localizedData.NotOwnerOfClusterResource -f (Get-ComputerName), $agentService.Name, $agentService.OwnerNode
                     ) -Verbose
                 }
             }
@@ -1209,7 +1238,7 @@ function Restart-SqlClusterService
         else
         {
             Write-Verbose -Message (
-                $script:localizedData.NotOwnerOfClusterResource -f $env:COMPUTERNAME, $sqlService.Name, $sqlService.OwnerNode
+                $script:localizedData.NotOwnerOfClusterResource -f (Get-ComputerName), $sqlService.Name, $sqlService.OwnerNode
             ) -Verbose
         }
     }
@@ -1247,7 +1276,7 @@ function Restart-ReportingServicesService
 
     if ($InstanceName -eq 'SSRS')
     {
-        # Check if we're dealing with SSRS 2017
+        # Check if we're dealing with SSRS 2017 or SQL2019
         $ServiceName = 'SQLServerReportingServices'
 
         Write-Verbose -Message ($script:localizedData.GetServiceInformation -f $ServiceName) -Verbose
@@ -1369,7 +1398,7 @@ function Invoke-Query
         [Parameter(ParameterSetName = 'SqlServer')]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $ServerName = $env:COMPUTERNAME,
+        $ServerName = (Get-ComputerName),
 
         [Parameter(ParameterSetName = 'SqlServer')]
         [System.String]
@@ -2010,7 +2039,7 @@ function Test-ActiveNode
             If the current node name is the same as the name the instances is
             running on, then this is the active node
         #>
-        $result = $ServerObject.ComputerNamePhysicalNetBIOS -eq $env:COMPUTERNAME
+        $result = $ServerObject.ComputerNamePhysicalNetBIOS -eq (Get-ComputerName)
     }
     else
     {
@@ -2333,6 +2362,11 @@ function Get-ServerProtocolObject
 
         $serverProtocolProperties = $serverInstance.ServerProtocols[$protocolNameProperties.Name]
     }
+    else
+    {
+        $errorMessage = $script:localizedData.FailedToObtainServerInstance -f $InstanceName, $ServerName
+        New-InvalidOperationException -Message $errorMessage
+    }
 
     return $serverProtocolProperties
 }
@@ -2394,4 +2428,34 @@ function Get-FilePathMajorVersion
     )
 
     (Get-Item -Path $Path).VersionInfo.ProductVersion.Split('.')[0]
+}
+
+<#
+    .SYNOPSIS
+        Test if the specific feature flag should be enabled.
+
+    .PARAMETER FeatureFlag
+        An array of feature flags that should be compared against.
+
+    .PARAMETER TestFlag
+        The feature flag that is being check if it should be enabled.
+#>
+function Test-FeatureFlag
+{
+    [CmdletBinding()]
+    [OutputType([System.Boolean])]
+    param
+    (
+        [Parameter()]
+        [System.String[]]
+        $FeatureFlag,
+
+        [Parameter(Mandatory = $true)]
+        [System.String]
+        $TestFlag
+    )
+
+    $flagEnabled = $FeatureFlag -and ($FeatureFlag -and $FeatureFlag.Contains($TestFlag))
+
+    return $flagEnabled
 }

@@ -14,7 +14,7 @@ ConvertFrom-StringData @'
     ConnectedToDatabaseEngineInstance = Connected to SQL instance '{0}'. (SQLCOMMON0018)
     FailedToConnectToDatabaseEngineInstance = Failed to connect to SQL instance '{0}'. (SQLCOMMON0019)
     ConnectedToAnalysisServicesInstance = Connected to Analysis Services instance '{0}'. (SQLCOMMON0020)
-    FailedToConnectToAnalysisServicesInstance = Failed to connected to Analysis Services instance '{0}'. (SQLCOMMON0021)
+    FailedToConnectToAnalysisServicesInstance = Failed to connect to Analysis Services instance '{0}'. (SQLCOMMON0021)
     SqlServerVersionIsInvalid = Could not get the SQL version for the instance '{0}'. (SQLCOMMON0022)
     PreferredModuleFound = Preferred module SqlServer found. (SQLCOMMON0023)
     PreferredModuleNotFound = Information: PowerShell module SqlServer not found, trying to use older SQLPS module. (SQLCOMMON0024)
@@ -55,4 +55,5 @@ ConvertFrom-StringData @'
     NotOwnerOfClusterResource = The node '{0}' is not the owner of the cluster resource '{1}'. The owner is '{2}' so no restart is needed. (SQLCOMMON0067)
     LoadedAssembly = Loaded the assembly '{0}'. (SQLCOMMON0068)
     FailedToLoadAssembly = Failed to load the assembly '{0}'. (SQLCOMMON0069)
+    FailedToObtainServerInstance = Failed to obtain a SQL Server instance with name '{0}' on server '{1}'. Ensure the SQL Server instance exists on the server and that the 'SQLServer' module references a version of the 'Microsoft.SqlServer.Management.Smo.Wmi' library that supports the version of the SQL Server instance. (SQLCOMMON0070)
 '@

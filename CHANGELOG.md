@@ -5,24 +5,181 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- SqlRole
-  - Major overhaul of resource.
-  - BREAKING CHANGE: Removed decision making from get-TargetResource; this
-    prevented a simple solution for issue #550. it now just tels if a role
-    exists or not. And what members are in that role. MembersToInclude and
-    MembersToExclude now always return $null.
-  - Added sanitize function (`Get-CorrectedMemberParameters`) to make it
-    so for the sysadmin role SA does not get altered ([issue #550](https://github.com/dsccommunity/SqlServerDsc/issues/550)).
-  - Added lots of tests.
+### Changed
+
 - SqlSetup
-  - Added a note to the documentation that the parameter `BrowserSvcStartupType`
-    cannot be used for configurations that utilize the `'InstallFailoverCluster'`
-    action ([issue #1627](https://github.com/dsccommunity/SqlServerDsc/issues/1627)).
-  - Minor change to the evaluation of the parameter `BrowserSvcStartupType`,
-    if it has an assigned a value or not.
+  - The helper function `Connect-SqlAnalysis` was using `LoadWithPartial()`
+    to load the assembly _Microsoft.AnalysisServices_. On a node where multiple
+    instances with different versions of SQL Server (regardless of features)
+    is installed, this will result in the first assembly found in the
+    GAC will be loaded into the session, not taking versions into account.
+    This can result in an assembly version being loaded that is not compatible
+    with the version of SQL Server it was meant to be used with.
+    A new method of loading the assembly _Microsoft.AnalysisServices_ was
+    introduced under a feature flag; `'AnalysisServicesConnection'`.
+    This new functionality depends on the [SqlServer](https://www.powershellgallery.com/packages/SqlServer)
+    module, and must be present on the node. The [SqlServer](https://www.powershellgallery.com/packages/SqlServer)
+    module can be installed on the node by leveraging the new DSC resource
+    `PSModule` in the [PowerShellGet](https://www.powershellgallery.com/packages/PowerShellGet/2.1.2)
+    module (v2.1.2 and higher). This new method does not work with the
+    SQLPS module due to the SQLPS module does not load the correct assembly,
+    while [SqlServer](https://www.powershellgallery.com/packages/SqlServer)
+    module (v21.1.18080 and above) does. The new functionality is used
+    when the parameter `FeatureFlag` is set to `'AnalysisServicesConnection'`.
+    This functionality will be the default in a future breaking release.
+  - Under a feature flag `'AnalysisServicesConnection'`. The detection of
+    a successful connection to the SQL Server Analysis Services has also been
+    changed. Now it actually evaluates the property `Connected` of the returned
+    `Microsoft.AnalysisServices.Server` object. The new functionality is used
+    when the parameter `FeatureFlag` is set to `'AnalysisServicesConnection'`.
+    This functionality will be the default in a future breaking release.
+
+## [15.1.1] - 2021-02-12
+
+### Fixed
+
+- SqlTraceFlag
+  - Fixed `$null` reference error when no actual trace flags are present.
+    Added two arrays to prevent a `$null` reference at compare-object
+    ([issue #1688](https://github.com/dsccommunity/SqlServerDsc/issues/1688)).
+- SqlServerDsc
+  - Removed a left-over comment in the file `analyzersettings.psd1`.
+
+## [15.1.0] - 2021-02-02
 
 ### Added
 
+- SqlServerDsc
+  - Added a new script analyzer rule to verify that `Import-SQLPSModule` or `Connect-SQL`
+    (that implicitly calls `Import-SQLPSModule`) is present in each `Get-`, `Test-`,
+    and `Set-TargetResource` function. If neither command is not needed then the
+    analyzer rule should be overridden ([issue #1683](https://github.com/dsccommunity/SqlServerDsc/issues/1683)).
+  - Added a new pipeline job that runs Script Analyzer on all PowerShell scripts
+    in the source folder. The rules are defined by the Script Analyzer settings
+    file `.vscode\analyzersettings.psd1` (which also the Visual Studio Code
+    PowerShell extension uses).
+  - Added unit tests and integration tests for SQL Server 2019
+    ([issue #1310](https://github.com/dsccommunity/SqlServerDsc/issues/1310)).
+
+### Changed
+
+- SqlServerDsc
+  - Suppressed new custom Script Analyzer rule `SqlServerDsc.AnalyzerRules\Measure-CommandsNeededToLoadSMO`
+    for `Get-`, `Test-`, and `Set-TargetResource` functions in the resources.
+- SqlLogin
+  - Added functionality to throw exception if an update to the `LoginMustChangePassword`
+    value on an existing SQL Login is attempted. This functionality is not supported
+    by referenced, SQL Server Management Object (SMO), libraries and cannot be
+    supported directly by this module.
+  - Added integration tests to ensure that an added (or updated) `SqlLogin` can
+    connect into a SQL instance once added (or updated).
+  - Added integration tests to ensure that the default database connected to by
+    a `SqlLogin` is the same as specified in the resource's `DefaultDatabase`
+    property/parameter.
+  - Amended how the interdependent, `PasswordExpirationEnabled` and `PasswordPolicyEnforced`
+    properties/parameters are updated within the `SqlLogin` resource - Both values
+    are now updated together if either one or both are not currently in the desired
+    state. This change avoids exceptions thrown by transitions to valid, combinations
+    of these properties that have to transition through an invalid combination (e.g.
+    where `PasswordExpirationEnabled` is `$true` but `PasswordPolicyEnforced` is
+    `$false`).
+- SqlSetup
+  - Minor refactor due to source code lint errors. The loop what evaluates
+    the configuration parameters `*FailoverCluster` was change to a `foreach()`.
+
+### Fixed
+
+- SqlServerDsc
+  - The component `gitversion` that is used in the pipeline was wrongly
+    configured when the repository moved to the new default branch `main`.
+    It no longer throws an error when using newer versions of GitVersion
+    ([issue #1674](https://github.com/dsccommunity/SqlServerDsc/issues/1674)).
+  - Minor lint errors throughout the repository.
+- SqlLogin
+  - Added integration tests to assert `LoginPasswordExpirationEnabled`,
+  `LoginPasswordPolicyEnforced` and `LoginMustChangePassword` properties/parameters
+  are applied and updated correctly. Similar integration tests also added to ensure
+  the password of the `SqlLogin` is updated if the password within the `SqlCredential`
+  value/object is changed ([issue #361](https://github.com/dsccommunity/SqlServerDsc/issues/361),
+  [issue #1032](https://github.com/dsccommunity/SqlServerDsc/issues/1032) and
+  [issue #1050](https://github.com/dsccommunity/SqlServerDsc/issues/1050)).
+  - Updated `SqlLogin`, integration tests to make use of amended `Wait-ForIdleLcm`,
+    helper function, `-Clear` switch usage to remove intermittent, integration
+    test failures ([issue #1634](https://github.com/dsccommunity/SqlServerDsc/issues/1634)).
+- SqlRSSetup
+  - If parameter `SuppressRestart` is set to `$false` the `/norestart`
+    argument is no longer wrongly added ([issue #1401](https://github.com/dsccommunity/SqlServerDsc/issues/1401)).
+- SqlSetup
+  - Added/corrected `InstallSharedDir`, property output when using SQL Server 2019.
+- SqlTraceFlag
+  - Fixed Assembly not loaded error ([issue #1680](https://github.com/dsccommunity/SqlServerDsc/issues/1680)).
+- SqlDatabaseUser
+  - Added parameter `ServerName` to the call of `Assert-SqlLogin`.
+    `@PSBoundParameters` doesn't capture the default value of `ServerName`
+    when it is not explicitly set by the caller ([issue #1647](https://github.com/dsccommunity/SqlServerDsc/issues/1647)).
+
+## [15.0.1] - 2021-01-09
+
+### Changed
+
+- SqlServerDsc
+  - Renamed `master` branch to `main` ([issue #1660](https://github.com/dsccommunity/SqlServerDsc/issues/1660)).
+  - The module manifest property `DscResourcesToExport` now updates automatically
+    using the pipeline.
+  - Removed `Export-ModuleMember` from DSC resource that still had it.
+  - The variable `$env:COMPUTERNAME` does not exist cross-platform which
+    hinders development and testing on macOS and Linux. Instead the
+    resources have been update to use the helper function `Get-ComputerName`
+    which returns the current computer name cross-plattform.
+  - Switch to GitHub Action Stale instead of GitHub App (Probot) Stale.
+
+### Fixed
+
+- SqlAGDatabase
+  - Fix for issue ([issue #1492](https://github.com/dsccommunity/SqlServerDsc/issues/1492))
+    added AutomaticSeeding for this resource. In Set-TargetResource added logic
+    that looks at all replicas of an availability group. When automatic seeding
+    is found, it will use that.
+  - Lots of extra tests to check AutomaticSeeding.
+  - The parameter `BackupPath` is still needed just in case a database never has
+    been backed up before.
+  - Fixed a typo.
+- SqlMaxDop
+  - Fixes ([issue #396](https://github.com/dsccommunity/SqlServerDsc/issues/396)).
+    Added three return values in Get-Target resource.
+- SqlProtocol
+  - Changed KeepAlive Type from UInt16 to Int32 to reflect the actual WMI.ManagementObject
+    Fixes #1645 ([issue #1645](https://github.com/dsccommunity/SqlServerDsc/issues/1645)).
+  - The verbose messages now correctly show that `$env:COMPUTERNAME` is used
+    to get or set the configuration, while parameter **ServerName** is used
+    to restart the instance.
+- SqlProtocolTcpIp
+  - The verbose messages now correctly show that `$env:COMPUTERNAME` is used
+    to get or set the configuration, while parameter **ServerName** is used
+    to restart the instance.
+- SqlDatabaseMail
+  - Now if a non-mandatory property is not part of the configuration it will
+    not be enforced ([issue #1661](https://github.com/dsccommunity/SqlServerDsc/issues/1661)).
+- SqlSetup
+  - When the SqlSetup detects that the expected components was not installed
+    and consequently throws an exception, that exception message now presents
+    a link to an article on how to find the SQL Server setup logs ([issue #1420](https://github.com/dsccommunity/SqlServerDsc/issues/1420)).
+- SqlRSSetup
+  - If parameter `EditionUpgrade` is set to `$false` the `/EditionUpgrade`
+    argument is no longer wrongly added ([issue #1398](https://github.com/dsccommunity/SqlServerDsc/issues/1398)).
+- SqlServerDsc.Common
+  - Updated `Get-ServerProtocolObject`, helper function to ensure an exception is
+    thrown if the specified instance cannot be obtained ([issue #1628](https://github.com/dsccommunity/SqlServerDsc/issues/1628)).
+
+## [15.0.0] - 2020-12-06
+
+### Added
+
+- SqlServerDsc
+  - Added new resource SqlTraceFlag to set or changes TraceFlags on SQL Server.
+    This resource is based on @Zuldans code but with SqlServerDsc integrated SMO.
+    Credits: https://github.com/Zuldan/cSQLServerTraceFlag
+  - Added a lot of test scripts to validated the code.
 - SqlEndpoint
   - Added support for the Service Broker Endpoint ([issue #498](https://github.com/dsccommunity/SqlServerDsc/issues/498)).
 - SqlDatabaseRole
@@ -42,8 +199,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SqlReplication
   - The resource are now using the helper function `Get-SqlInstanceMajorVersion`
     ([issue #1408](https://github.com/dsccommunity/SqlServerDsc/issues/1408)).
+- SqlRole
+  - Major overhaul of resource.
+  - BREAKING CHANGE: Removed decision making from get-TargetResource; this
+    prevented a simple solution for issue #550. it now just tels if a role
+    exists or not. And what members are in that role. MembersToInclude and
+    MembersToExclude now always return $null.
+  - Added sanitize function (`Get-CorrectedMemberParameters`) to make it
+    so for the sysadmin role SA does not get altered ([issue #550](https://github.com/dsccommunity/SqlServerDsc/issues/550)).
+  - Added lots of tests.
+- SqlWaitForAG
+  - BREAKING CHANGE: Fix for issue ([issue #1569](https://github.com/dsccommunity/SqlServerDsc/issues/1569))
+    The resource now waits for the Availability Group to become Available.
+  - Two parameters where added to test get and set resource at instance level.
+- SqlSetup
+  - Minor change to the evaluation of the parameter `BrowserSvcStartupType`,
+    if it has an assigned a value or not.
 
 ### Fixed
+
 - SqlDatabaseRole
   - Fixed check to see if the role and user existed in the database. The
     previous logic would always indicate the role or user was not found unless
@@ -53,6 +227,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SqlAlwaysOnService
   - Updated Get-TargetResource to return all defined schema properties
     ([issue #150](https://github.com/dsccommunity/SqlServerDsc/issues/1501)).
+- SqlSetup
+  - Added a note to the documentation that the parameter `BrowserSvcStartupType`
+    cannot be used for configurations that utilize the `'InstallFailoverCluster'`
+    action ([issue #1627](https://github.com/dsccommunity/SqlServerDsc/issues/1627)).
+- SqlDatabaseObjectPermission
+  - Updated unit tests to remove errors relating to missing `Where()` method
+    ([issue #1648](https://github.com/dsccommunity/SqlServerDsc/issues/1648)).
 
 ## [14.2.1] - 2020-08-14
 

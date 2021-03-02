@@ -21,7 +21,8 @@ $script:localizedData = Get-LocalizedData -DefaultUICulture 'en-US'
     .PARAMETER ServerName
         Specifies the host name of the SQL Server to be configured. If the
         SQL Server belongs to a cluster or availability group specify the host
-        name for the listener or cluster group. Default value is $env:COMPUTERNAME.
+        name for the listener or cluster group. Default value is the
+        current computer name.
 
     .PARAMETER SuppressRestart
         If set to $true then the any attempt by the resource to restart the service
@@ -61,7 +62,7 @@ function Get-TargetResource
         [Parameter()]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $ServerName = $env:COMPUTERNAME,
+        $ServerName = (Get-ComputerName),
 
         [Parameter()]
         [System.Boolean]
@@ -89,8 +90,11 @@ function Get-TargetResource
         TcpDynamicPort    = $null
     }
 
+    # Getting the server protocol properties by using the computer name.
+    $computerName = Get-ComputerName
+
     Write-Verbose -Message (
-        $script:localizedData.GetCurrentState -f $IpAddressGroup, $InstanceName, $ServerName
+        $script:localizedData.GetCurrentState -f $IpAddressGroup, $InstanceName, $computerName
     )
 
     Import-SQLPSModule
@@ -100,7 +104,7 @@ function Get-TargetResource
         to a cluster instance or availability group listener.
     #>
     $getServerProtocolObjectParameters = @{
-        ServerName   = $env:COMPUTERNAME
+        ServerName   = $computerName
         Instance     = $InstanceName
         ProtocolName = 'TcpIp'
     }
@@ -149,7 +153,7 @@ function Get-TargetResource
                     #>
                 }
 
-                Default
+                default
                 {
                     $returnValue.AddressFamily = $ipAddressGroupObject.IPAddress.AddressFamily
                     $returnValue.IpAddress = $ipAddressGroupObject.IPAddress.IPAddressToString
@@ -189,7 +193,8 @@ function Get-TargetResource
     .PARAMETER ServerName
         Specifies the host name of the SQL Server to be configured. If the SQL
         Server belongs to a cluster or availability group specify the host name
-        for the listener or cluster group. Default value is `$env:COMPUTERNAME`.
+        for the listener or cluster group. Default value is the current computer
+        name.
 
     .PARAMETER Enabled
         Specified if the IP address group should be enabled or disabled. Only used if
@@ -224,6 +229,7 @@ function Get-TargetResource
 #>
 function Set-TargetResource
 {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('SqlServerDsc.AnalyzerRules\Measure-CommandsNeededToLoadSMO', '', Justification='The command Import-SQLPSModule is implicitly called when calling Compare-TargetResourceState')]
     [CmdletBinding()]
     param
     (
@@ -238,7 +244,7 @@ function Set-TargetResource
         [Parameter()]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $ServerName = $env:COMPUTERNAME,
+        $ServerName = (Get-ComputerName),
 
         [Parameter()]
         [System.Boolean]
@@ -279,8 +285,11 @@ function Set-TargetResource
 
     if ($propertiesNotInDesiredState.Count -gt 0)
     {
+        # Getting the server protocol properties by using the computer name.
+        $computerName = Get-ComputerName
+
         Write-Verbose -Message (
-            $script:localizedData.SetDesiredState -f $IpAddressGroup, $InstanceName
+            $script:localizedData.SetDesiredState -f $IpAddressGroup, $InstanceName, $computerName
         )
 
         <#
@@ -288,7 +297,7 @@ function Set-TargetResource
             to a cluster instance or availability group listener.
         #>
         $getServerProtocolObjectParameters = @{
-            ServerName   = $env:COMPUTERNAME
+            ServerName   = $computerName
             Instance     = $InstanceName
             ProtocolName = 'TcpIp'
         }
@@ -351,7 +360,7 @@ function Set-TargetResource
                         #>
                     }
 
-                    Default
+                    default
                     {
                         # Check if Enable property need updating.
                         if ($propertiesNotInDesiredState.Where( { $_.ParameterName -eq 'Enabled' }))
@@ -407,11 +416,15 @@ function Set-TargetResource
 
         if (-not $SuppressRestart -and $isRestartNeeded)
         {
+            <#
+                This is using the $ServerName to be able to restart a cluster
+                instance or availability group listener.
+            #>
             $restartSqlServiceParameters = @{
                 ServerName   = $ServerName
                 InstanceName = $InstanceName
                 Timeout      = $RestartTimeout
-                OwnerNode    = $env:COMPUTERNAME
+                OwnerNode    = Get-ComputerName
             }
 
             Restart-SqlService @restartSqlServiceParameters
@@ -444,7 +457,8 @@ function Set-TargetResource
     .PARAMETER ServerName
         Specifies the host name of the SQL Server to be configured. If the
         SQL Server belongs to a cluster or availability group specify the host
-        name for the listener or cluster group. Default value is $env:COMPUTERNAME.
+        name for the listener or cluster group. Default value is the current
+        computer name.
 
     .PARAMETER Enabled
         Specified if the IP address group should be enabled or disabled. Only used if
@@ -479,6 +493,7 @@ function Set-TargetResource
 #>
 function Test-TargetResource
 {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('SqlServerDsc.AnalyzerRules\Measure-CommandsNeededToLoadSMO', '', Justification='The command Import-SQLPSModule is implicitly called when calling Compare-TargetResourceState')]
     [CmdletBinding()]
     [OutputType([System.Boolean])]
     param
@@ -494,7 +509,7 @@ function Test-TargetResource
         [Parameter()]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $ServerName = $env:COMPUTERNAME,
+        $ServerName = (Get-ComputerName),
 
         [Parameter()]
         [System.Boolean]
@@ -563,7 +578,8 @@ function Test-TargetResource
     .PARAMETER ServerName
         Specifies the host name of the SQL Server to be configured. If the
         SQL Server belongs to a cluster or availability group specify the host
-        name for the listener or cluster group. Default value is $env:COMPUTERNAME.
+        name for the listener or cluster group. Default value is the current
+        computer name.
 
     .PARAMETER Enabled
         Specified if the IP address group should be enabled or disabled. Only used if
@@ -612,7 +628,7 @@ function Compare-TargetResourceState
         [Parameter()]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $ServerName = $env:COMPUTERNAME,
+        $ServerName = (Get-ComputerName),
 
         [Parameter()]
         [System.Boolean]
@@ -690,7 +706,7 @@ function Compare-TargetResourceState
             )
         }
 
-        Default
+        default
         {
             $propertiesToEvaluate = @(
                 'Enabled'

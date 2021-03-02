@@ -28,7 +28,7 @@ $script:localizedData = Get-LocalizedData -DefaultUICulture 'en-US'
 
     .PARAMETER ServerName
         Specifies the host name of the SQL Server to be configured. Default value
-        is $env:COMPUTERNAME.
+        is the current computer name.
 
     .PARAMETER Credential
         The credentials to authenticate with, using SQL Authentication. To authenticate using Windows Authentication, assign the credentials
@@ -53,6 +53,7 @@ $script:localizedData = Get-LocalizedData -DefaultUICulture 'en-US'
 #>
 function Get-TargetResource
 {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('SqlServerDsc.AnalyzerRules\Measure-CommandsNeededToLoadSMO', '', Justification='The command Import-SQLPSModule is implicitly called in Invoke-SqlScript')]
     [CmdletBinding()]
     [OutputType([System.Collections.Hashtable])]
     param
@@ -76,7 +77,7 @@ function Get-TargetResource
         [Parameter()]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $ServerName = $env:COMPUTERNAME,
+        $ServerName = (Get-ComputerName),
 
         [Parameter()]
         [System.Management.Automation.PSCredential]
@@ -159,7 +160,7 @@ function Get-TargetResource
 
     .PARAMETER ServerName
         Specifies the host name of the SQL Server to be configured. Default value
-        is $env:COMPUTERNAME.
+        is the current computer name.
 
     .PARAMETER Credential
         The credentials to authenticate with, using SQL Authentication. To authenticate using Windows Authentication, assign the credentials
@@ -181,6 +182,7 @@ function Get-TargetResource
 #>
 function Set-TargetResource
 {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('SqlServerDsc.AnalyzerRules\Measure-CommandsNeededToLoadSMO', '', Justification='The command Import-SQLPSModule is implicitly called in Invoke-SqlScript')]
     [CmdletBinding()]
     param
     (
@@ -203,7 +205,7 @@ function Set-TargetResource
         [Parameter()]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $ServerName = $env:COMPUTERNAME,
+        $ServerName = (Get-ComputerName),
 
         [Parameter()]
         [System.Management.Automation.PSCredential]
@@ -269,7 +271,7 @@ function Set-TargetResource
 
     .PARAMETER ServerName
         Specifies the host name of the SQL Server to be configured. Default value
-        is $env:COMPUTERNAME.
+        is the current computer name.
 
     .PARAMETER Credential
         The credentials to authenticate with, using SQL Authentication. To authenticate using Windows Authentication, assign the credentials
@@ -292,6 +294,7 @@ function Set-TargetResource
 #>
 function Test-TargetResource
 {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('SqlServerDsc.AnalyzerRules\Measure-CommandsNeededToLoadSMO', '', Justification='The command Import-SQLPSModule is implicitly called in Invoke-SqlScript')]
     [CmdletBinding()]
     [OutputType([System.Boolean])]
     param
@@ -315,7 +318,7 @@ function Test-TargetResource
         [Parameter()]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $ServerName = $env:COMPUTERNAME,
+        $ServerName = (Get-ComputerName),
 
         [Parameter()]
         [System.Management.Automation.PSCredential]
@@ -386,4 +389,3 @@ function Test-TargetResource
     }
 }
 
-Export-ModuleMember -Function *-TargetResource

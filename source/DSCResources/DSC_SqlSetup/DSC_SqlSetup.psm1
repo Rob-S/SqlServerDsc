@@ -48,6 +48,7 @@ $script:localizedData = Get-LocalizedData -DefaultUICulture 'en-US'
 #>
 function Get-TargetResource
 {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('SqlServerDsc.AnalyzerRules\Measure-CommandsNeededToLoadSMO', '', Justification='The command Connect-Sql is called implicitly in several function, for example Get-SqlEngineProperties')]
     [CmdletBinding()]
     [OutputType([System.Collections.Hashtable])]
     param
@@ -155,7 +156,7 @@ function Get-TargetResource
     }
     else
     {
-        $sqlHostName = $env:COMPUTERNAME
+        $sqlHostName = Get-ComputerName
     }
 
     # Force drive list update, to pick up any newly mounted volumes
@@ -341,7 +342,7 @@ function Get-TargetResource
         $getTargetResourceReturnValue.ASSvcAccountUsername = $serviceAnalysisService.UserName
         $getTargetResourceReturnValue.AsSvcStartupType = $serviceAnalysisService.StartupType
 
-        $analysisServer = Connect-SQLAnalysis -ServerName $sqlHostName -InstanceName $InstanceName
+        $analysisServer = Connect-SQLAnalysis -ServerName $sqlHostName -InstanceName $InstanceName -FeatureFlag $FeatureFlag
 
         $getTargetResourceReturnValue.ASCollation = $analysisServer.ServerProperties['CollationName'].Value
         $getTargetResourceReturnValue.ASDataDir = $analysisServer.ServerProperties['DataDir'].Value
@@ -993,7 +994,7 @@ function Set-TargetResource
 
     foreach ($feature in $featuresArray)
     {
-        if (($sqlVersion -in ('13', '14')) -and ($feature -in ('ADV_SSMS', 'SSMS')))
+        if (($sqlVersion -in ('13', '14', '15')) -and ($feature -in ('ADV_SSMS', 'SSMS')))
         {
             $errorMessage = $script:localizedData.FeatureNotSupported -f $feature
             New-InvalidOperationException -Message $errorMessage
@@ -1017,7 +1018,7 @@ function Set-TargetResource
     # If SQL shared components already installed, clear InstallShared*Dir variables
     switch ($sqlVersion)
     {
-        { $_ -in ('10', '11', '12', '13', '14') }
+        { $_ -in ('10', '11', '12', '13', '14', '15') }
         {
             if ((Get-Variable -Name 'InstallSharedDir' -ErrorAction SilentlyContinue) -and (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Installer\UserData\S-1-5-18\Components\FEE2E540D20152D4597229B6CFBC0A69' -ErrorAction SilentlyContinue))
             {
@@ -1096,7 +1097,7 @@ function Set-TargetResource
             # Determine whether the current node is a possible owner of the disk resource
             $possibleOwners = $diskResource | Get-CimAssociatedInstance -Association 'MSCluster_ResourceToPossibleOwner' -KeyOnly | Select-Object -ExpandProperty Name
 
-            if ($possibleOwners -icontains $env:COMPUTERNAME)
+            if ($possibleOwners -icontains (Get-ComputerName))
             {
                 $diskResource.IsPossibleOwner = $true
             }
@@ -1511,7 +1512,6 @@ function Set-TargetResource
                     {
                         $setupArgumentValue = '"{0}"' -f $currentSetupArgument.Value
                     }
-
                 }
             }
 
@@ -1864,6 +1864,7 @@ function Set-TargetResource
 #>
 function Test-TargetResource
 {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('SqlServerDsc.AnalyzerRules\Measure-CommandsNeededToLoadSMO', '', Justification='The command Connect-Sql is implicitly called when Get-TargetResource is called')]
     [CmdletBinding()]
     [OutputType([System.Boolean])]
     param
@@ -2179,17 +2180,17 @@ function Test-TargetResource
     {
         Write-Verbose -Message $script:localizedData.EvaluatingClusterParameters
 
-        $boundParameters.Keys |
-            Where-Object -FilterScript { $_ -imatch "^FailoverCluster" } |
-            ForEach-Object -Process {
-                $variableName = $_
+        $variableNames = $boundParameters.Keys |
+            Where-Object -FilterScript { $_ -imatch "^FailoverCluster" }
 
-                if ($getTargetResourceResult.$variableName -ne $boundParameters[$variableName])
-                {
-                    Write-Verbose -Message ($script:localizedData.ClusterParameterIsNotInDesiredState -f $variableName, $($boundParameters[$variableName]))
-                    $result = $false
-                }
+        foreach ($variableName in $variableNames)
+        {
+            if ($getTargetResourceResult.$variableName -ne $boundParameters[$variableName])
+            {
+                Write-Verbose -Message ($script:localizedData.ClusterParameterIsNotInDesiredState -f $variableName, $($boundParameters[$variableName]))
+                $result = $false
             }
+        }
     }
 
     if ($getTargetResourceParameters.Action -eq 'Upgrade')
@@ -2502,36 +2503,6 @@ function Get-InstalledSharedFeatures
     }
 
     return $sharedFeatures
-}
-
-<#
-    .SYNOPSIS
-        Test if the specific feature flag should be enabled.
-
-    .PARAMETER FeatureFlag
-        An array of feature flags that should be compared against.
-
-    .PARAMETER TestFlag
-        The feature flag that is being check if it should be enabled.
-#>
-function Test-FeatureFlag
-{
-    [CmdletBinding()]
-    [OutputType([System.Boolean])]
-    param
-    (
-        [Parameter()]
-        [System.String[]]
-        $FeatureFlag,
-
-        [Parameter(Mandatory = $true)]
-        [System.String]
-        $TestFlag
-    )
-
-    $flagEnabled = $FeatureFlag -and ($FeatureFlag -and $FeatureFlag.Contains($TestFlag))
-
-    return $flagEnabled
 }
 
 <#
@@ -3247,7 +3218,7 @@ function Get-SqlSharedPaths
 
     switch ($SqlServerMajorVersion)
     {
-        { $_ -in ('10', '11', '12', '13', '14') }
+        { $_ -in ('10', '11', '12', '13', '14', '15') }
         {
             $registryKeySharedDir = 'FEE2E540D20152D4597229B6CFBC0A69'
             $registryKeySharedWOWDir = 'A79497A344129F64CA7D69C56F5DD8B4'
